@@ -47,8 +47,12 @@ choice.
   top of a structural guarantee that no agent's actual conclusion ever
   depends on an LLM response; OpenTelemetry tracing.
 - **Deployment:** hardened, non-root container images with built-in
-  health checks; configurable CORS; automated GHCR image publishing on
-  every green `main`; a deployment guide (`docs/deployment.md`).
+  health checks; configurable CORS; a deployment guide
+  (`docs/deployment.md`). A GHCR image-publishing workflow
+  (`.github/workflows/docker-publish.yml`) was added but has not yet
+  succeeded on any run — see "Known limitations" below and
+  `docs/deployment.md` for current status; building from source remains
+  the only verified path today.
 - **Open source readiness:** `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`,
   `SECURITY.md`, issue/PR templates.
 
@@ -62,6 +66,14 @@ choice.
   disclosed dataset — not spec-scale (50-100+ incidents).
 - No live LLM has been exercised end-to-end in this project's own build
   environment; the deterministic path is what's been verified there.
+- The GHCR image-publishing workflow has not yet succeeded on any run —
+  no pre-built images are available yet (see `docs/deployment.md`).
+
+**Note on the links below:** as of this writing, the `v0.1.0` git tag
+exists in the codebase's history locally but has not been pushed to
+GitHub, and no GitHub Release has been published — these links will
+404 until that happens. They're included per the standard
+Keep a Changelog format and will resolve once the tag/release exist.
 
 [Unreleased]: https://github.com/AkshitRampershad/incidentlab/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/AkshitRampershad/incidentlab/releases/tag/v0.1.0

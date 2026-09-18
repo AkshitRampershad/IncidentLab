@@ -508,12 +508,20 @@ flowchart LR
 - **`.dockerignore`** (existed since Phase 1, extended this phase) —
   keeps `.git`, `__pycache__`, `node_modules`, `.env`, and friends out of
   the build context both Dockerfiles share (`context: .`).
-- **`.github/workflows/docker-publish.yml`** — builds and pushes both
-  images to GHCR, gated on `ci.yml` succeeding on `main` (DDR-030), so a
-  red `main` never gets published as a good build. Cannot be executed
-  inside the sandbox this project is built in (no GitHub Actions runner
-  here) — correct by construction against well-established
-  `docker/build-push-action` patterns, not by a completed run.
+- **`.github/workflows/docker-publish.yml`** — intended to build and
+  push both images to GHCR, gated on `ci.yml` succeeding on `main`
+  (DDR-030), so a red `main` never gets published as a good build.
+  **Update:** now that it has actually run on GitHub's real runners
+  (unlike this sandbox, which has no GitHub Actions runner), every run
+  so far has failed — `Cache export is not supported for the docker
+  driver` at the `docker/build-push-action` step, because the runner's
+  default buildx driver doesn't support `cache-to: type=gha` without an
+  explicit `docker/setup-buildx-action` step first, which this workflow
+  doesn't have. No image has ever been successfully pushed. This was
+  "correct by construction against well-established patterns" when
+  written and is not — the missing setup step is a real, fixable gap,
+  not yet fixed as of this writing. See `docs/deployment.md` for current
+  status.
 - **`docs/deployment.md`** — a real deployment guide: pre-built-image vs.
   build-on-host options, the `.env` values that *must* change for a real
   deployment (`POSTGRES_PASSWORD`, `CORS_ALLOWED_ORIGINS`,

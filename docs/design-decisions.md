@@ -809,6 +809,25 @@ GitHub Actions runner here — see this phase's disclosure in
 `docker/build-push-action` patterns and by validating the YAML parses as
 intended, not by a real run completing.
 
+**Update (post-release accuracy review):** it has since run three times
+on GitHub's real runners and failed every time, identically:
+`ERROR: failed to build: Cache export is not supported for the docker
+driver.` The `cache-to: type=gha` line above needs the
+`docker-container` buildx driver, which requires an explicit
+`docker/setup-buildx-action@v3` step before `docker/build-push-action`
+— this workflow never had one, so it silently fell back to the `docker`
+driver, which cannot export a GHA cache at all. "Correct by matching
+well-established patterns" turned out to be wrong in a specific,
+checkable way: the pattern this workflow matched was incomplete. No
+image has ever been pushed to GHCR as a result — `README.md` and
+`docs/deployment.md` were corrected to stop describing GHCR publishing
+as working, and `docs/IMPLEMENTATION_STATUS.md`'s "Post-release accuracy
+review" section has the full incident, including the exact job-log
+error retrieved via `mcp__github__get_job_logs`. Fixing the workflow
+(adding the missing setup step) is the concrete next action, not done as
+part of the review that found this, which was scoped to documentation
+accuracy, not code changes.
+
 ## DDR-031: Alembic migrations remain deferred, reaffirmed specifically for this deployment phase
 
 **Context:** DDR-004 (Phase 1) deferred Alembic because there was no

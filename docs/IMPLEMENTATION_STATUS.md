@@ -949,10 +949,13 @@ actually exercising the system adversarially, not by code review.
   `CORS_ALLOWED_ORIGINS` threaded through to `api`.
 - `.dockerignore` — extended (already existed since Phase 1) to also
   exclude `__pycache__`, `*.pyc`, `.github`.
-- `.github/workflows/docker-publish.yml` — new: builds and pushes
-  `apps/api`/`apps/web` to GHCR, gated on the existing `CI` workflow
+- `.github/workflows/docker-publish.yml` — new: intended to build and
+  push `apps/api`/`apps/web` to GHCR, gated on the existing `CI` workflow
   succeeding on `main` (`workflow_run`, not a direct `push` trigger), so
-  a red `main` never gets published as a good build — DDR-030.
+  a red `main` never gets published as a good build — DDR-030. **Not yet
+  working in practice** — see this file's Phase 10 entry (added during a
+  later review pass) for the confirmed failure reason and current
+  status; do not treat "the workflow exists" as "images are published."
 - `docs/deployment.md` — new: pre-built-image vs. build-on-host
   deployment options, the `.env` values that must change for a real
   deployment (table: `POSTGRES_PASSWORD`, `CORS_ALLOWED_ORIGINS`,
@@ -1022,9 +1025,13 @@ rather than glossing over it.
   not by a build/run that finished. The repo owner completing a real
   `docker compose up --build` (as in Phase 1) is still the actual
   end-to-end check.
-- `docker-publish.yml` has never executed (no GitHub Actions runner in
-  this sandbox) — same caveat as CI itself in every prior phase, just
-  now applying to a second workflow file.
+- `docker-publish.yml` had never executed as of when this entry was
+  first written (no GitHub Actions runner in this sandbox). **Update
+  (later review pass, see this file's Phase 10 entry):** it has since
+  run for real on GitHub's own runners and failed every time — a real
+  bug, not a hypothetical caveat. Left here, uncorrected in place, as an
+  honest record of what was known at the time; do not read this bullet
+  as current status.
 - No TLS/reverse proxy, no managed Postgres, no Ollama service, no real
   horizontal scaling story — all explicitly scoped out in
   `docs/deployment.md` with reasons, not silently absent.
@@ -1119,6 +1126,24 @@ git push origin v0.1.0         # HTTP 403, retried once, still 403 —
 ```
 
 **Known limitations:**
+- **`docker-publish.yml` (Phase 9) has never successfully published an
+  image — discovered in a later review pass, not when this phase was
+  first written.** Checking the workflow's actual run history on GitHub
+  (`mcp__github__actions_list`/`get_job_logs`, not assumed) shows all 3
+  runs since Phase 9 failed identically: `ERROR: failed to build: Cache
+  export is not supported for the docker driver.` The runner's default
+  `docker` buildx driver doesn't support `cache-to: type=gha` — the
+  workflow needs a `docker/setup-buildx-action@v3` step (which selects
+  the `docker-container` driver) before `docker/build-push-action`,
+  which it doesn't have. No image has ever reached
+  `ghcr.io/<owner>/incidentlab-api` or `-web`. This is a real,
+  root-caused bug in the workflow file itself, not a permissions issue
+  or a sandbox limitation — fixing it (adding the missing setup step)
+  was out of scope for the review pass that found it, which was
+  documentation/consistency-focused; `README.md` and `docs/deployment.md`
+  were corrected to stop claiming images are published, and this is
+  flagged here as the concrete next action for whoever picks this back
+  up.
 - **The `v0.1.0` tag itself never reached `origin`.** `git push origin
   v0.1.0` returned a persistent `HTTP 403` (not a flake — retried once,
   and this session's git credential had just successfully pushed a
@@ -1162,3 +1187,70 @@ work from here is genuinely open-ended (see `README.md`'s Roadmap and
 this file's own "Known limitations" sections throughout), which is the
 intended shape for an open-source project at this point, not a gap in
 the plan.
+
+---
+
+## Post-release accuracy review
+
+Not a new phase — a documentation/consistency review of the completed
+10-phase codebase, done at the user's explicit request after Phase 10.
+Scope was strictly `README.md` and the consistency of
+`CHANGELOG.md`/`SECURITY.md`/`CONTRIBUTING.md`/`CODE_OF_CONDUCT.md`/issue
+and PR templates with the actual, verified project state — no
+application code, no new agents/integrations/architecture.
+
+**What this found, by actually checking rather than assuming:**
+- Queried the real GitHub Actions run history for
+  `docker-publish.yml` and `ci.yml` (`mcp__github__actions_list`,
+  `mcp__github__get_job_logs`) rather than relying on what earlier
+  phases' docs claimed. Result: `ci.yml` has passed on every push (12/12
+  runs green); `docker-publish.yml` has failed on all 3 of its runs,
+  every time at the same `docker/build-push-action` step, with the same
+  root cause (`Cache export is not supported for the docker driver` — a
+  missing `docker/setup-buildx-action` step). No image has ever reached
+  GHCR. Every place `README.md`, `docs/deployment.md`, and
+  `docs/architecture.md` stated or implied that images "are published"
+  has been corrected to state plainly that the workflow exists but has
+  not yet succeeded, with the specific failure reason and a pointer to
+  the Actions tab for current status.
+- Re-confirmed via `git ls-remote --tags origin` that the `v0.1.0` tag
+  is still not on GitHub, and that no GitHub Release exists — `README.md`
+  now states this explicitly in a dedicated "Project Status" section
+  rather than leaving it inferrable only from `docs/design-decisions.md`.
+- `README.md` was substantially restructured (not just amended) to be
+  legible to a reader evaluating the project quickly (what it is, the
+  engineering problem, why the architecture is shaped this way, the
+  actual measured benchmark numbers in a table, the security model, how
+  to run it) while keeping every factual claim traceable to what's
+  actually implemented and verified elsewhere in this repo — no new
+  metrics, no changed benchmark methodology, no invented public URL. A
+  "Live Demo" section states plainly that none exists yet, and a
+  "Screenshots" section states plainly that none are included, rather
+  than a broken image link or an invented one.
+- `CHANGELOG.md`'s `0.1.0` entry's "automated GHCR image publishing"
+  bullet was corrected to reflect that the workflow exists but has not
+  yet succeeded — the previous wording read as a shipped capability, but
+  the underlying automation itself, not just its use, does not yet work
+  as described.
+- `SECURITY.md`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, and the
+  issue/PR templates were reviewed against the corrected `README.md` and
+  found already consistent — none of them made a claim this review
+  needed to correct.
+
+**Verification run this pass:** `uv run pytest -q` (189 passed, no test
+files touched — this was a documentation-only review), `uv run ruff
+check .` and `uv run ruff format --check .` (clean), `uv sync` (resolves
+cleanly). `git diff`/`git status` were reviewed before committing to
+confirm the change set matched exactly what's described above.
+
+**Still requires a manual GitHub-side action, unchanged from Phase 10,
+now with one addition:**
+1. Push the `v0.1.0` tag and publish a GitHub Release from it (blocked
+   by this session's/toolset's permissions, not attempted again this
+   pass since nothing about that permission changed).
+2. Set the repository's description/topics (same reason).
+3. **New:** fix `docker-publish.yml` by adding a
+   `docker/setup-buildx-action@v3` step before the build/push step, then
+   confirm a run actually succeeds and an image lands on
+   `ghcr.io/<owner>/incidentlab-api`/`-web` before re-describing GHCR
+   publishing as working in any doc.
