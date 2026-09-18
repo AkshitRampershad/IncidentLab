@@ -8,7 +8,7 @@
 - [x] Phase 6 — Evaluation
 - [x] Phase 7 — UI
 - [x] Phase 8 — Security + Observability
-- [ ] Phase 9 — Deployment
+- [x] Phase 9 — Deployment
 - [ ] Phase 10 — Open Source Release
 
 ---
@@ -929,3 +929,113 @@ actually exercising the system adversarially, not by code review.
   limitations).
 
 **Next phase:** Phase 9 — Deployment.
+
+---
+
+## Phase 9 — Deployment
+
+**Implemented:**
+- `core/config.py` / `apps/api/main.py` — CORS origins are now
+  `Settings.cors_allowed_origins` (comma-separated, configurable) instead
+  of Phase 1's hardcoded `http://localhost:3000` — see DDR-028. Found
+  while scoping this phase: any real deployment would have had the web
+  UI silently broken by the browser's own CORS enforcement, with no
+  server-side error pointing at the cause.
+- `apps/api/Dockerfile` / `apps/web/Dockerfile` — both now run as an
+  unprivileged user (`appuser` uid 1000 / the official Node image's
+  built-in `node` user) and declare their own `HEALTHCHECK` instruction,
+  not relying solely on `docker-compose.yml`'s (DDR-029).
+- `docker-compose.yml` — `restart: unless-stopped` on all three services;
+  `CORS_ALLOWED_ORIGINS` threaded through to `api`.
+- `.dockerignore` — extended (already existed since Phase 1) to also
+  exclude `__pycache__`, `*.pyc`, `.github`.
+- `.github/workflows/docker-publish.yml` — new: builds and pushes
+  `apps/api`/`apps/web` to GHCR, gated on the existing `CI` workflow
+  succeeding on `main` (`workflow_run`, not a direct `push` trigger), so
+  a red `main` never gets published as a good build — DDR-030.
+- `docs/deployment.md` — new: pre-built-image vs. build-on-host
+  deployment options, the `.env` values that must change for a real
+  deployment (table: `POSTGRES_PASSWORD`, `CORS_ALLOWED_ORIGINS`,
+  `NEXT_PUBLIC_API_URL`, `ENVIRONMENT`), what's deliberately out of scope
+  and why (TLS/reverse proxy, managed Postgres, Ollama as a service, real
+  scaling, Alembic), backup guidance (`pg_dump` against the named
+  volume), and log guidance.
+- `.env.example` — added `CORS_ALLOWED_ORIGINS`; also backfilled Phase
+  8's `TOOL_TIMEOUT_SECONDS`/`MAX_TOOL_CALLS_PER_INVESTIGATION`/
+  `INVESTIGATION_TIMEOUT_SECONDS`, which existed in `core/config.py` but
+  were never added to this file.
+- `docs/architecture.md` (Phase 9 slice) and `docs/design-decisions.md`
+  (DDR-028 through DDR-031 — CORS, container hardening, GHCR publishing,
+  and Alembic's deferral explicitly reaffirmed for this phase rather than
+  silently carried over).
+
+**Files changed:** `core/config.py`, `apps/api/main.py`,
+`apps/api/Dockerfile`, `apps/web/Dockerfile`, `docker-compose.yml`,
+`.dockerignore`, `.env.example`, `.github/workflows/docker-publish.yml`
+(new), `docs/deployment.md` (new), plus two new test files (below),
+`docs/architecture.md`, `docs/design-decisions.md`.
+
+**Tests added:**
+- Unit: `test_config.py` — `cors_allowed_origins_list` parsing: default,
+  comma-separated, whitespace-trimmed, empty-entry-dropping (a trailing
+  comma must not produce a `""` origin — starlette's `CORSMiddleware`
+  treats that as a real, wrong value), fully-empty-string case.
+- Integration (real Postgres, real running app via `httpx.ASGITransport`):
+  `test_api_cors.py` — a request from the configured origin gets
+  `access-control-allow-origin` echoed back; a request from an
+  unconfigured origin gets no such header at all (the actual property a
+  browser relies on, not just that the setting parses).
+
+**Commands actually run in this session, with real output:**
+```
+uv run pytest -q              # 189 passed (7 new for Phase 9), against
+                               # the same real local Postgres as every
+                               # prior phase
+uv run ruff check .           # All checks passed!
+uv run ruff format --check .  # 99 files already formatted
+docker compose config --quiet # valid — env-var interpolation, the new
+                               # CORS_ALLOWED_ORIGINS pass-through, and
+                               # restart: unless-stopped on all three
+                               # services all resolve correctly
+```
+Also actually started the Docker daemon in this sandbox (it can run —
+new information this phase; prior phases only knew Docker Hub was
+unreachable, not whether `dockerd` itself would even start here) and
+attempted a real `docker build` of `apps/api/Dockerfile`, to see how far
+image resolution would actually get: `docker pull hello-world` returned
+`403 Forbidden` from `production.cloudfront.docker.com` (Docker Hub's
+blob CDN, blocked by the organization's egress policy — matches Phase
+1's finding); `docker build` separately got as far as a metadata `HEAD`
+request to `registry-1.docker.io` before hitting a `429 Too Many
+Requests` from Docker Hub's own anonymous-pull rate limit, on a retry
+too. Two different, independently-confirmed reasons neither `docker
+build` nor `docker compose up --build` can complete in this sandbox —
+not a single flaky failure. `docs/deployment.md` states this precisely
+rather than glossing over it.
+
+**Known limitations:**
+- Still genuinely unverified end to end: no `docker build`/`docker
+  compose up --build` has completed in this sandbox in any phase,
+  including this one — everything Docker-related here is correct by
+  inspection, by `docker compose config` validation, and by matching
+  well-established patterns (multi-stage builds, `docker/build-push-action`),
+  not by a build/run that finished. The repo owner completing a real
+  `docker compose up --build` (as in Phase 1) is still the actual
+  end-to-end check.
+- `docker-publish.yml` has never executed (no GitHub Actions runner in
+  this sandbox) — same caveat as CI itself in every prior phase, just
+  now applying to a second workflow file.
+- No TLS/reverse proxy, no managed Postgres, no Ollama service, no real
+  horizontal scaling story — all explicitly scoped out in
+  `docs/deployment.md` with reasons, not silently absent.
+- Alembic is still not implemented — DDR-031 reaffirms Phase 1's
+  original deferral (DDR-004) with deployment-specific reasoning rather
+  than treating it as settled from four phases ago.
+- No automated backup schedule — `docs/deployment.md`'s `pg_dump`
+  guidance is manual; this is disclosed as a deliberate scope cut (a
+  lab/demo system with regeneratable data), not an oversight.
+- `docker-publish.yml` builds a single architecture (whatever the GitHub
+  runner provides, currently `linux/amd64`) — no multi-arch `buildx`
+  matrix; revisit if an actual arm64 deployment need shows up.
+
+**Next phase:** Phase 10 — Open Source Release.

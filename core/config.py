@@ -50,6 +50,17 @@ class Settings(BaseSettings):
     max_tool_calls_per_investigation: int = 100
     investigation_timeout_seconds: float = 120.0
 
+    # Phase 9: hardcoding "http://localhost:3000" (Phase 1's dev-only
+    # value) made every non-local deployment structurally unable to
+    # configure its own frontend origin. Comma-separated so `.env`/compose
+    # stays plain strings, not JSON — consistent with every other setting
+    # here.
+    cors_allowed_origins: str = "http://localhost:3000"
+
+    @property
+    def cors_allowed_origins_list(self) -> list[str]:
+        return [origin.strip() for origin in self.cors_allowed_origins.split(",") if origin.strip()]
+
     @property
     def database_url(self) -> str:
         return (

@@ -2,17 +2,18 @@
 
 Open-source multi-agent incident investigation & evaluation lab.
 
-> **Status: Phase 8 of 10 (Security + Observability).** A web UI
-> (`docker compose up`, then http://localhost:3000) lets you generate an
-> incident, run a full investigation, and review the result without
-> touching the CLI or reading logs — plus a benchmark dashboard. Tool
-> calls are now allowlisted, timed out, budgeted, and audit-logged
-> (`tools/registry.py`); one agent failing degrades gracefully instead of
-> crashing the whole investigation (spec §43); every `incident_id` is
-> validated before it reaches the database. Deployment tooling described
-> below doesn't exist yet. See `docs/IMPLEMENTATION_STATUS.md` for what's
-> actually implemented today, and don't take the rest of this README as a
-> description of current capability.
+> **Status: Phase 9 of 10 (Deployment).** A web UI (`docker compose up`,
+> then http://localhost:3000) lets you generate an incident, run a full
+> investigation, and review the result without touching the CLI or
+> reading logs — plus a benchmark dashboard. Tool calls are allowlisted,
+> timed out, budgeted, and audit-logged (`tools/registry.py`); one agent
+> failing degrades gracefully instead of crashing the whole investigation
+> (spec §43); every `incident_id` is validated before it reaches the
+> database. Every push to `main` publishes container images to GHCR
+> (`docs/deployment.md`) and both containers now run as unprivileged
+> users with their own health checks. See `docs/IMPLEMENTATION_STATUS.md`
+> for what's actually implemented today, and don't take the rest of this
+> README as a description of current capability.
 
 ## What is IncidentLab?
 
@@ -155,13 +156,22 @@ Postgres (DDR-027). Traces are real OpenTelemetry spans
 (`core/telemetry.py`) visible in process output — no collector is stood
 up yet (see Roadmap below).
 
+## Deployment
+
+Docker images are built and published to GHCR automatically on every
+push to `main` that passes CI. See `docs/deployment.md` for the actual
+deployment guide — what `.env` values must change for a real deployment,
+what's deliberately out of scope (TLS, a managed Postgres, Ollama as a
+service, Alembic), and backup/log guidance.
+
 ## Roadmap
 
-Deployment tooling and the open-source release checklist will be filled
-in as each remaining phase (see `docs/IMPLEMENTATION_STATUS.md`) actually
-ships — not written speculatively ahead of the code. A real OTel
-collector (to visualize the traces above, not just print them) is one of
-the concrete gaps left.
+The open-source release checklist (Phase 10) is the one remaining phase
+— see `docs/IMPLEMENTATION_STATUS.md`, not written speculatively ahead of
+the code. A real OTel collector (to visualize the traces mentioned above,
+not just print them) and the deployment gaps `docs/deployment.md` lists
+explicitly (TLS/reverse proxy, a managed Postgres, real horizontal
+scaling, Alembic) are the concrete gaps left.
 
 ## License
 

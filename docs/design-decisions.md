@@ -703,3 +703,143 @@ for the same reason in a different shape: each instance runs three
 architectures' worth of real investigations, so an unbounded value on a
 public endpoint is a genuine resource-exhaustion vector, not just a slow
 response — spec §41's "oversized requests" in practice, not in theory.
+
+## DDR-028: CORS origins are configurable, not hardcoded to `localhost:3000`
+
+**Context:** `apps/api/main.py`'s `CORSMiddleware` has hardcoded
+`allow_origins=["http://localhost:3000"]` since Phase 1 — correct for
+local dev, structurally wrong for any other deployment: a browser
+running the web app from any other origin (a real domain, a staging
+subdomain, even `http://127.0.0.1:3000` instead of `localhost`) would
+have every API request silently blocked by the browser's own CORS
+enforcement, with no server-side error to point at the cause.
+
+**Decision:** `core/config.py`'s `Settings.cors_allowed_origins` (a
+comma-separated string, matching every other multi-value setting's shape
+in this project — no JSON parsing needed in `.env`) plus a
+`cors_allowed_origins_list` property that splits, trims, and drops empty
+entries. `apps/api/main.py` passes that list to `CORSMiddleware` instead
+of the hardcoded value. Default stays `http://localhost:3000` so local
+dev needs no `.env` change.
+
+**Why:** this was found while scoping Phase 9's deployment work, not
+hypothetically — `docker compose up` on any host other than the
+developer's own machine would silently break the entire web UI with no
+obvious cause (a blocked CORS request looks like nothing in the
+Network tab's response, since the browser never shows the server's
+answer for a disallowed origin). Comma-separated over JSON-encoded
+matches every other setting here (`llm_*`, `confidence_*`, Phase 8's
+tool-budget settings) rather than introducing the one setting in this
+project that needs a different parsing convention. Empty-entry filtering
+matters because starlette's `CORSMiddleware` treats a literal `""` in
+`allow_origins` as a real (wrong) value, not a harmless no-op — a
+trailing comma in a hand-edited `.env` would otherwise silently produce
+one. See `tests/unit/test_config.py` for the parsing and
+`tests/integration/test_api_cors.py` for the real running app reflecting
+whatever's configured.
+
+## DDR-029: containers run as an unprivileged user and carry their own `HEALTHCHECK`
+
+**Context:** both `apps/api/Dockerfile` and `apps/web/Dockerfile` ran
+their process as the image's default root user, and had no
+`HEALTHCHECK` instruction of their own — `docker-compose.yml` defines
+one for `api` (used for its `depends_on: condition: service_healthy`
+gate), but nothing at the image level, and `web` had no health signal at
+all, anywhere.
+
+**Decision:** `apps/api/Dockerfile` creates and switches to a plain
+`appuser` (uid 1000) after all files are in place; `apps/web/Dockerfile`
+switches to the `node` user the official Node images already ship with
+(no need to create one). Both images now declare their own
+`HEALTHCHECK`: `apps/api`'s reuses the same check `docker-compose.yml`
+already had (`urllib.request.urlopen('http://localhost:8000/health')`);
+`apps/web`'s is new — Node's own `http` client hitting `/` (no
+curl/wget in `node:22-slim`, and no dedicated health route exists in a
+plain Next.js app, but the standalone server returns the dashboard's
+static HTML for `/` regardless of whether the API is reachable, since
+every API call is client-side after hydration — a real "this process is
+alive and serving" signal, not a fake always-200 stub).
+
+**Why:** neither process needs root — no host mounts, no writes outside
+its own working directory, no binding to a privileged (<1024) port
+(8000/3000 both are unprivileged) — so running as root inside the
+container is pure unnecessary blast radius if either process is ever
+compromised, consistent with Phase 8's security posture carrying into
+deployment. Baking `HEALTHCHECK` into the image itself (not just
+`docker-compose.yml`) means both images report their own health
+correctly under any runtime that reads it — `docker run` directly, or a
+future orchestrator (Kubernetes, ECS, Swarm) — not only under Compose;
+`docs/deployment.md` calls this out explicitly as *why* no
+orchestrator-specific manifests were written for this phase (the images
+are already correct inputs to one, whenever one exists).
+
+## DDR-030: published images go to GHCR, gated on CI passing, one image per push — no multi-arch, no registry secrets
+
+**Context:** every deployment option before this phase required building
+from source on the target host (`docker compose up --build`). spec-level
+"Deployment" work should let someone actually run IncidentLab without a
+local build toolchain.
+
+**Decision:** `.github/workflows/docker-publish.yml` builds and pushes
+`apps/api` and `apps/web` to GHCR
+(`ghcr.io/<owner>/incidentlab-api`/`-web`), tagged `latest` and by commit
+SHA, triggered by `workflow_run` on `ci.yml` (the existing `CI` workflow)
+completing successfully on `main` — not on every push directly. Uses
+`GITHUB_TOKEN` (no registry secrets to configure) and GitHub Actions'
+own build cache (`type=gha`). Single architecture (whatever the GitHub
+runner is — currently `linux/amd64`), no multi-arch `buildx` matrix.
+
+**Why:** gating on CI success (rather than `on: push: branches: [main]`
+directly) means a red `main` — a real, not-yet-fixed regression — never
+gets published as if it were a good build; `docker-publish.yml` checks
+out `github.event.workflow_run.head_sha` specifically so it publishes
+exactly the commit CI actually tested, not whatever `main` has moved to
+by the time this workflow runs. `GITHUB_TOKEN` over a personal access
+token or registry credentials is the same reasoning as every other
+"don't add infrastructure before it's needed" decision in this project
+(DDR-005, DDR-009, DDR-012): it already exists, needs no setup, and
+GHCR's permission model under it is exactly "this repo's own images,"
+which is exactly the scope needed. No multi-arch build for the same
+reason Alembic (DDR-031, below) stays deferred — added complexity with
+no verified need behind it yet; a `linux/arm64` user filing an issue
+asking for it is a real signal this doesn't have today. This workflow
+cannot be executed inside the sandbox this project is built in (no
+GitHub Actions runner here — see this phase's disclosure in
+`docs/deployment.md`), so it's correct by matching well-established
+`docker/build-push-action` patterns and by validating the YAML parses as
+intended, not by a real run completing.
+
+## DDR-031: Alembic migrations remain deferred, reaffirmed specifically for this deployment phase
+
+**Context:** DDR-004 (Phase 1) deferred Alembic because there was no
+schema yet; through Phase 8, `core/models.py`'s schema has never had a
+single migration-worthy change — every phase either added a wholly new
+table/column additively or left the schema alone, and `create_all_tables()`
+(idempotent, additive-only) has been the entire "migration" story the
+whole time. A "Deployment" phase is exactly the point a real spec would
+expect this decision to be revisited, not silently carried forward.
+
+**Decision:** still no Alembic. `create_all_tables()` remains the only
+schema-management mechanism, called from `simulator.replay.run_scenario()`
+and `apps/api/main.py`'s `lifespan` hook (DDR from Phase 7's "Bug found"
+section) — both of which already run on every real deployment's first
+request/incident, with no separate migration step to document or forget.
+
+**Why:** Alembic's entire value is managing *changes* to a schema across
+environments and time — version tracking, up/down migrations, drift
+detection. None of that has ever been exercised here: there has never
+been a second schema version to migrate *to*. Adding Alembic now would
+mean writing exactly one "initial" revision that does what
+`create_all_tables()` already does, with real added complexity (a
+migrations directory, `alembic.ini`, a documented `alembic upgrade head`
+deployment step, a new way for a deployment to be in an inconsistent
+state if that step is skipped) and zero exercised benefit — the same
+"don't build ahead of a real need" reasoning as DDR-005, DDR-009, DDR-012,
+and DDR-030's multi-arch call above. This is a lab/demo system whose
+schema this project itself fully controls (not a service accepting
+external schema-affecting integrations), so the actual trigger to revisit
+this is concrete and checkable: the day a real change needs to preserve
+existing data through a schema change (a column rename, a type change, a
+`NOT NULL` added to existing rows) rather than an additive `CREATE TABLE
+IF NOT EXISTS`, `create_all_tables()` is no longer sufficient and Alembic
+stops being speculative.

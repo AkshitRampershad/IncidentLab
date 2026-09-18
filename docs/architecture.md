@@ -475,3 +475,61 @@ the real API — all reach a clean 4xx, never a 500), plus
 and `test_telemetry.py`. Measured directly, not assumed: a real
 `db_connection_pool` investigation makes 38 tool calls end to end with no
 LLM configured.
+
+## Phase 9: Deployment
+
+```mermaid
+flowchart LR
+    push["push to main"] --> ci["ci.yml (CI)"]
+    ci -->|"success, workflow_run"| publish[docker-publish.yml]
+    publish -->|build + push| ghcr[("ghcr.io/<owner>/<br/>incidentlab-api, -web")]
+
+    subgraph target host
+        compose["docker compose up"] --> api_c["api container<br/>(appuser, HEALTHCHECK)"]
+        compose --> web_c["web container<br/>(node user, HEALTHCHECK)"]
+        compose --> pg_c[(postgres)]
+    end
+    ghcr -.->|"docker compose pull"| compose
+```
+
+- **`core/config.py` / `apps/api/main.py`** — CORS origins are now
+  `Settings.cors_allowed_origins` (configurable, comma-separated),
+  replacing Phase 1's hardcoded `http://localhost:3000` (DDR-028) — the
+  concrete bug this phase's own scoping work found: any deployment on a
+  real domain would have silently had every browser request blocked with
+  no server-side error to point at.
+- **`apps/api/Dockerfile` / `apps/web/Dockerfile`** — both now run as an
+  unprivileged user (`appuser` / the Node image's built-in `node` user)
+  and declare their own `HEALTHCHECK`, not just relying on
+  `docker-compose.yml`'s (DDR-029) — correct under any runtime that reads
+  an image's health signal, not only Compose.
+- **`docker-compose.yml`** — `restart: unless-stopped` on all three
+  services; `CORS_ALLOWED_ORIGINS` threaded through to the `api` service.
+- **`.dockerignore`** (existed since Phase 1, extended this phase) —
+  keeps `.git`, `__pycache__`, `node_modules`, `.env`, and friends out of
+  the build context both Dockerfiles share (`context: .`).
+- **`.github/workflows/docker-publish.yml`** — builds and pushes both
+  images to GHCR, gated on `ci.yml` succeeding on `main` (DDR-030), so a
+  red `main` never gets published as a good build. Cannot be executed
+  inside the sandbox this project is built in (no GitHub Actions runner
+  here) — correct by construction against well-established
+  `docker/build-push-action` patterns, not by a completed run.
+- **`docs/deployment.md`** — a real deployment guide: pre-built-image vs.
+  build-on-host options, the `.env` values that *must* change for a real
+  deployment (`POSTGRES_PASSWORD`, `CORS_ALLOWED_ORIGINS`,
+  `NEXT_PUBLIC_API_URL`, `ENVIRONMENT`), what's deliberately out of scope
+  (TLS/reverse proxy, a managed Postgres, Ollama as a service, real
+  horizontal scaling, Alembic — DDR-031), and backup/log guidance for the
+  single-host Compose deployment this phase actually covers.
+
+Same disclosure as every prior phase: this sandbox cannot pull images
+from Docker Hub — confirmed two distinct ways while working on this
+phase (a blob download returns `403 Forbidden` from the organization's
+egress policy; a separate registry metadata request hits Docker Hub's
+own anonymous rate limit instead), so `docker build`/`docker compose up
+--build` were never run to completion here. `docker compose config
+--quiet` (no pulls needed) passes with every change in this phase; the
+Dockerfiles and workflow are correct by inspection and by matching
+established patterns, not by a build that finished in this sandbox.
+`docs/deployment.md` states this plainly rather than implying more
+verification happened than actually did.

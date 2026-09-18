@@ -1,6 +1,7 @@
 services:
   postgres:
     image: postgres:16-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-incidentlab}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-incidentlab}
@@ -19,6 +20,7 @@ services:
     build:
       context: .
       dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
     environment:
       ENVIRONMENT: ${ENVIRONMENT:-development}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
@@ -27,6 +29,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-incidentlab}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-incidentlab}
       POSTGRES_DB: ${POSTGRES_DB:-incidentlab}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000}
     ports:
       - "${API_PORT:-8000}:8000"
     depends_on:
@@ -42,6 +45,7 @@ services:
     build:
       context: .
       dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
     environment:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
     ports:
