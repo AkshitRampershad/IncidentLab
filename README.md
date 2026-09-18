@@ -1,19 +1,27 @@
 # IncidentLab
 
+[![CI](https://github.com/AkshitRampershad/incidentlab/actions/workflows/ci.yml/badge.svg)](https://github.com/AkshitRampershad/incidentlab/actions/workflows/ci.yml)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg)](CODE_OF_CONDUCT.md)
+
 Open-source multi-agent incident investigation & evaluation lab.
 
-> **Status: Phase 9 of 10 (Deployment).** A web UI (`docker compose up`,
-> then http://localhost:3000) lets you generate an incident, run a full
-> investigation, and review the result without touching the CLI or
-> reading logs — plus a benchmark dashboard. Tool calls are allowlisted,
-> timed out, budgeted, and audit-logged (`tools/registry.py`); one agent
-> failing degrades gracefully instead of crashing the whole investigation
-> (spec §43); every `incident_id` is validated before it reaches the
-> database. Every push to `main` publishes container images to GHCR
-> (`docs/deployment.md`) and both containers now run as unprivileged
-> users with their own health checks. See `docs/IMPLEMENTATION_STATUS.md`
-> for what's actually implemented today, and don't take the rest of this
-> README as a description of current capability.
+> **Status: v0.1.0 — all 10 phases complete.** A web UI
+> (`docker compose up`, then http://localhost:3000) lets you generate an
+> incident, run a full investigation, and review the result without
+> touching the CLI or reading logs — plus a benchmark dashboard. Tool
+> calls are allowlisted, timed out, budgeted, and audit-logged
+> (`tools/registry.py`); one agent failing degrades gracefully instead of
+> crashing the whole investigation (spec §43); every `incident_id` is
+> validated before it reaches the database. Every push to `main`
+> publishes container images to GHCR (`docs/deployment.md`) and both
+> containers run as unprivileged users with their own health checks.
+> "Complete" means every phase of the original build spec shipped, not
+> that every listed limitation is gone — see
+> `docs/IMPLEMENTATION_STATUS.md` for what's actually implemented and
+> what's still a disclosed gap (no auth/rate-limiting, no TLS built in, a
+> small evaluation dataset), and don't take the rest of this README as a
+> description of more than that.
 
 ## What is IncidentLab?
 
@@ -166,12 +174,22 @@ service, Alembic), and backup/log guidance.
 
 ## Roadmap
 
-The open-source release checklist (Phase 10) is the one remaining phase
-— see `docs/IMPLEMENTATION_STATUS.md`, not written speculatively ahead of
-the code. A real OTel collector (to visualize the traces mentioned above,
-not just print them) and the deployment gaps `docs/deployment.md` lists
-explicitly (TLS/reverse proxy, a managed Postgres, real horizontal
-scaling, Alembic) are the concrete gaps left.
+All 10 phases of the original build spec are done (see
+`docs/IMPLEMENTATION_STATUS.md`) — that doesn't mean nothing's left. A
+real OTel collector (to visualize the traces mentioned above, not just
+print them) and the deployment gaps `docs/deployment.md` lists explicitly
+(TLS/reverse proxy, a managed Postgres, real horizontal scaling, Alembic)
+are the concrete, disclosed gaps, not secretly-missing "phases."
+
+## Contributing
+
+Contributions are welcome — see `CONTRIBUTING.md` for dev setup, this
+project's conventions (in particular: how design decisions get recorded
+in `docs/design-decisions.md`, and what a new incident scenario actually
+needs), and the PR checklist. This project follows the
+[Contributor Covenant](CODE_OF_CONDUCT.md). Report security issues
+privately per `SECURITY.md`, not as a public issue. `CHANGELOG.md` tracks
+what shipped in each release.
 
 ## License
 

@@ -9,7 +9,7 @@
 - [x] Phase 7 — UI
 - [x] Phase 8 — Security + Observability
 - [x] Phase 9 — Deployment
-- [ ] Phase 10 — Open Source Release
+- [x] Phase 10 — Open Source Release
 
 ---
 
@@ -1039,3 +1039,107 @@ rather than glossing over it.
   matrix; revisit if an actual arm64 deployment need shows up.
 
 **Next phase:** Phase 10 — Open Source Release.
+
+---
+
+## Phase 10 — Open Source Release
+
+**Implemented:**
+- `CODE_OF_CONDUCT.md` — Contributor Covenant 2.1, unmodified.
+- `SECURITY.md` — private vulnerability-reporting path (GitHub security
+  advisory + email), scope, and an explicit "known, deliberate
+  limitations — not vulnerabilities to report" section naming what
+  Phases 1/8/9 already disclosed (no auth/rate-limiting, no TLS, the
+  bounded-but-real cost of `/evaluations/run`).
+- `CONTRIBUTING.md` — dev setup (mirrors the README), the DDR convention
+  explained for a newcomer (with pointers to specific existing DDRs as
+  examples of the expected honesty/specificity), the concrete
+  "adding a scenario needs these five pieces together" checklist, code
+  style (including this project's "no comments unless the why is
+  non-obvious" convention), and a PR checklist.
+- `.github/ISSUE_TEMPLATE/bug_report.yml`, `feature_request.yml`,
+  `config.yml` (security advisories + discussions as contact links,
+  rather than a blank issue for either) — both templates point at
+  `docs/architecture.md`/`design-decisions.md` before someone re-files
+  something already reasoned through there.
+- `.github/pull_request_template.md` — mirrors `CONTRIBUTING.md`'s
+  checklist exactly, so the two can't drift apart silently.
+- `CHANGELOG.md` — Keep a Changelog format; a `0.1.0` entry summarizing
+  all ten phases at release-note granularity (distilled from this file,
+  not duplicating its exhaustive per-phase detail), including a
+  "Known limitations" section so the release notes themselves don't
+  overclaim.
+- `pyproject.toml` — added `authors` and `[project.urls]`
+  (Homepage/Repository/Issues/Changelog).
+- `README.md` — CI/License/Contributor-Covenant badges, status line
+  changed from "Phase 9 of 10" to "v0.1.0 — all 10 phases complete" with
+  an explicit sentence that this means every phase shipped, not that
+  every disclosed limitation is resolved; a new "Contributing" section
+  linking `CONTRIBUTING.md`/`CODE_OF_CONDUCT.md`/`SECURITY.md`/
+  `CHANGELOG.md`.
+- A `v0.1.0` annotated git tag, pushed to `origin`.
+- `docs/architecture.md` (Phase 10 slice) and `docs/design-decisions.md`
+  (DDR-032).
+
+**Files changed:** `CODE_OF_CONDUCT.md` (new), `SECURITY.md` (new),
+`CONTRIBUTING.md` (new), `CHANGELOG.md` (new),
+`.github/ISSUE_TEMPLATE/bug_report.yml` (new),
+`.github/ISSUE_TEMPLATE/feature_request.yml` (new),
+`.github/ISSUE_TEMPLATE/config.yml` (new),
+`.github/pull_request_template.md` (new), `pyproject.toml`, `README.md`,
+`docs/architecture.md`, `docs/design-decisions.md`, plus the `v0.1.0`
+tag.
+
+**Tests added:** none — this phase is documentation and repository
+metadata, not application code. `uv sync` was re-run to confirm the
+`pyproject.toml` metadata additions (`authors`, `[project.urls]`) don't
+break dependency resolution; the full existing suite (189 tests) and
+`ruff check`/`format --check` were re-run to confirm nothing else
+regressed.
+
+**Commands actually run in this session, with real output:**
+```
+uv sync                       # Resolved 64 packages — authors/urls
+                               # metadata doesn't affect resolution
+uv run pytest -q               # 189 passed (no new tests this phase —
+                               # see above), same real local Postgres as
+                               # every prior phase
+uv run ruff check .            # All checks passed!
+uv run ruff format --check .   # clean
+git tag -a v0.1.0 -m "..."     # created
+git push origin v0.1.0         # pushed
+```
+
+**Known limitations:**
+- No GitHub Release object exists yet (a Releases-UI entry with release
+  notes attached to the `v0.1.0` tag) — no tool available in this
+  session's toolset exposes creating one (only reading existing
+  releases/tags), unlike the tag itself, which is a plain git operation.
+  A one-time, few-minute action for the repo owner: GitHub's "Draft a
+  new release" UI, pointed at the `v0.1.0` tag, with `CHANGELOG.md`'s
+  `[0.1.0]` section as the body.
+- The repository's GitHub-side description and topics are still unset —
+  same reason: no available tool exposes that GitHub API surface. Also a
+  one-time manual step (repo Settings, or the gear icon next to "About"
+  on the repo's main page).
+- `docker-publish.yml` (Phase 9) only tags images `latest` and by commit
+  SHA — it doesn't yet build a versioned image tag on a `v*` tag push.
+  Not added this phase to keep the two concerns (GHCR publishing
+  cadence, semantic-version tagging) from being conflated without an
+  actual consumer asking for pinned version tags yet — the same
+  "don't build ahead of a real need" reasoning as DDR-030's multi-arch
+  call and DDR-031's Alembic deferral.
+- `CHANGELOG.md` will need real maintenance discipline going forward
+  (an entry per meaningful external-facing change) that this
+  phase-based build process didn't previously need, since
+  `docs/IMPLEMENTATION_STATUS.md` already served that role internally —
+  worth calling out explicitly so it doesn't silently go stale the way
+  an added-then-abandoned changelog often does.
+
+**This is the last phase of the original build spec.** IncidentLab
+v0.1.0 is a complete, working system across all ten phases — not a
+finished product with every disclosed limitation resolved. Continued
+work from here is genuinely open-ended (see `README.md`'s Roadmap and
+this file's own "Known limitations" sections throughout), which is the
+intended shape for an open-source project at this point, not a gap in
+the plan.

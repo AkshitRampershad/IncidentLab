@@ -1,0 +1,32 @@
+name: Feature request
+description: Propose new functionality or an extension to an existing scenario/agent/tool.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        `docs/architecture.md` and `docs/design-decisions.md` explain a lot
+        of "why not yet" — many obvious-looking gaps (a vector store,
+        real git integration, Alembic, multi-arch images) are deliberate,
+        documented deferrals with a stated trigger for revisiting them.
+        Checking there first avoids re-proposing something already reasoned
+        through.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: What can't you do today that this would let you do?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed approach
+      description: >-
+        If you have one. For a new incident scenario specifically, see
+        CONTRIBUTING.md's "Adding a new incident scenario" section — it
+        needs several pieces together, not just a failure injector.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered

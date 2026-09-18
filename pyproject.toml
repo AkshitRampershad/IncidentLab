@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Open-source multi-agent incident investigation & evaluation lab"
 readme = "README.md"
 license = "Apache-2.0"
+authors = [{ name = "Akshit Rampershad", email = "akshitrampershad@gmail.com" }]
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.115",
@@ -18,6 +19,12 @@ dependencies = [
     "opentelemetry-api>=1.44.0",
     "opentelemetry-sdk>=1.44.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/AkshitRampershad/incidentlab"
+Repository = "https://github.com/AkshitRampershad/incidentlab"
+Issues = "https://github.com/AkshitRampershad/incidentlab/issues"
+Changelog = "https://github.com/AkshitRampershad/incidentlab/blob/main/CHANGELOG.md"
 
 [dependency-groups]
 dev = [

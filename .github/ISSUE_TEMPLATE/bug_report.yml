@@ -1,0 +1,47 @@
+name: Bug report
+description: Something doesn't work the way this project says it should.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before filing: check `docs/IMPLEMENTATION_STATUS.md`'s "Known
+        limitations" for the relevant phase, and `docs/design-decisions.md`
+        — some things that look like bugs are documented, deliberate scope
+        cuts (e.g. no Alembic, no auth). If it's disclosed there, it's not
+        a bug report, it's a feature request for that specific gap.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, what actually happened?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: Exact commands, requests, or UI clicks. Include a scenario_id/incident_id if relevant.
+    validations:
+      required: true
+  - type: dropdown
+    id: how-run
+    attributes:
+      label: How are you running IncidentLab?
+      options:
+        - docker compose up --build (Quick Start)
+        - Local (non-Docker) dev — make setup / make dev
+        - Pre-built GHCR images
+        - Something else (describe below)
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Docker/Postgres versions if relevant, and anything unusual about your .env.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs/output
+      render: shell

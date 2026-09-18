@@ -843,3 +843,50 @@ existing data through a schema change (a column rename, a type change, a
 `NOT NULL` added to existing rows) rather than an additive `CREATE TABLE
 IF NOT EXISTS`, `create_all_tables()` is no longer sufficient and Alembic
 stops being speculative.
+
+## DDR-032: `v0.1.0` marks all ten phases done, not a promise that every limitation is resolved
+
+**Context:** Phase 10 is "Open Source Release" — the point a real
+external contributor might actually show up. Nothing before this phase
+added the files that make a repository legible and safe to contribute
+to (a code of conduct, a vulnerability-reporting path, issue/PR
+templates, a contributor guide), and there was no tagged version anyone
+could actually reference or install a "release" of.
+
+**Decision:** added `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1,
+unmodified — a well-known standard is exactly the case where writing a
+custom one adds nothing), `SECURITY.md` (a private-reporting path, plus
+an explicit "known, deliberate limitations — not vulnerabilities to
+report" section naming the things Phase 1/8/9 already disclosed as
+out-of-scope, so a report doesn't duplicate a documented decision),
+`CONTRIBUTING.md` (dev setup, the DDR convention explained for a
+newcomer, and the concrete "adding a scenario needs these five things
+together" checklist — general contributing-guide boilerplate would have
+missed everything actually specific to this project), issue templates
+that point at `docs/architecture.md`/`design-decisions.md` before
+someone re-proposes something already reasoned through, a PR template
+mirroring `CONTRIBUTING.md`'s checklist, `CHANGELOG.md` (a concise,
+release-facing summary distilled from `docs/IMPLEMENTATION_STATUS.md`'s
+exhaustive phase-by-phase log — deliberately not a duplicate of it),
+`pyproject.toml` author/URL metadata, and a `v0.1.0` git tag. The
+README's status line changed from "Phase 9 of 10" to "v0.1.0 — all 10
+phases complete," with an explicit sentence that "complete" means every
+phase shipped, not that every disclosed limitation is gone.
+
+**Why:** the last sentence above is the load-bearing one — this project
+has been honest about limitations in every phase's own docs (small
+eval dataset, no auth, no Alembic, sandbox verification gaps), and a
+release announcement that reads as "done" without that caveat would
+undo that pattern at the exact moment (a tagged public release) most
+likely to be someone's first impression. A generic, copy-pasted
+`CONTRIBUTING.md` would actively mislead a first-time contributor about
+what this project actually expects (real Postgres in tests, DDRs for
+real decisions, no mocked-database shortcut) — worse than not having one.
+Two things this phase could not do from inside this build environment,
+and says so rather than silently skipping: creating an actual GitHub
+Release object (release notes attached to the tag, shown in the repo's
+Releases UI) and setting the repository's description/topics — no tool
+available here exposes either GitHub operation, unlike creating and
+pushing the tag itself (a plain git operation). Both are one-time,
+few-minute actions for the repo owner, not blockers to anything else in
+this phase.

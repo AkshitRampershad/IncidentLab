@@ -533,3 +533,32 @@ Dockerfiles and workflow are correct by inspection and by matching
 established patterns, not by a build that finished in this sandbox.
 `docs/deployment.md` states this plainly rather than implying more
 verification happened than actually did.
+
+## Phase 10: Open Source Release
+
+No code architecture changes this phase — it's the repository-hygiene
+layer that makes an external contributor's first PR possible, and a
+tagged version anyone can actually point at:
+
+- **`CODE_OF_CONDUCT.md`** (Contributor Covenant 2.1), **`SECURITY.md`**
+  (private vulnerability reporting, plus an explicit "known limitations,
+  not vulnerabilities" section naming what Phases 1/8/9 already
+  disclosed as out of scope), **`CONTRIBUTING.md`** (dev setup, the DDR
+  convention explained for a newcomer, and what adding a new incident
+  scenario actually requires — five pieces together, per
+  `CONTRIBUTING.md` itself).
+- **`.github/ISSUE_TEMPLATE/`** and **`.github/pull_request_template.md`**
+  — structured bug/feature templates that point at
+  `docs/architecture.md`/`design-decisions.md` before a re-proposal of
+  something already reasoned through; a PR template mirroring
+  `CONTRIBUTING.md`'s checklist.
+- **`CHANGELOG.md`** — a concise, release-facing `0.1.0` summary,
+  distilled from `docs/IMPLEMENTATION_STATUS.md`'s exhaustive
+  phase-by-phase log rather than duplicating it.
+- **`pyproject.toml`** — author and `[project.urls]` metadata.
+- A **`v0.1.0` git tag**, pushed — see DDR-032 for why this marks "every
+  phase of the build spec shipped," explicitly not "every disclosed
+  limitation resolved," and for the two GitHub-side actions (a Releases
+  UI entry, repo description/topics) this phase could not do from inside
+  this build environment — no available tool exposes either operation,
+  unlike the tag itself (a plain git operation).
