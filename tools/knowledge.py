@@ -4,6 +4,7 @@ from pathlib import Path
 from evidence.models import Evidence, SourceType
 from evidence.provenance import build_evidence_id, build_provenance
 from evidence.scoring import matches_query
+from tools.registry import allowlisted_tool
 
 KNOWLEDGE_ROOT = Path(__file__).resolve().parent.parent / "knowledge"
 _RUNBOOKS_DIR = KNOWLEDGE_ROOT / "runbooks"
@@ -40,6 +41,7 @@ def _search_dir(
     return evidence
 
 
+@allowlisted_tool("search_knowledge")
 async def search_knowledge(incident_id: str, query: str | None = None) -> list[Evidence]:
     """spec §14's search_knowledge(): runbooks + architecture docs,
     keyword-matched. No vector search yet — see docs/design-decisions.md;
@@ -52,6 +54,7 @@ async def search_knowledge(incident_id: str, query: str | None = None) -> list[E
     )
 
 
+@allowlisted_tool("search_historical_incidents")
 async def search_historical_incidents(incident_id: str, query: str | None = None) -> list[Evidence]:
     """spec §14's search_historical_incidents()."""
     return _search_dir(
@@ -62,6 +65,7 @@ async def search_historical_incidents(incident_id: str, query: str | None = None
     )
 
 
+@allowlisted_tool("get_runbook")
 async def get_runbook(incident_id: str, name: str) -> Evidence | None:
     """spec §14's get_runbook(): fetch one runbook by filename stem (e.g.
     "db-connection-pool-exhaustion"), or None if it doesn't exist."""

@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from core.db import get_session_factory
 from core.models import IncidentRecord
 from evidence.models import Evidence
+from tools.registry import allowlisted_tool
 
 
 class IncidentPublic(BaseModel):
@@ -21,6 +22,7 @@ class IncidentPublic(BaseModel):
     end_time: datetime
 
 
+@allowlisted_tool("get_incident")
 async def get_incident(incident_id: str) -> IncidentPublic:
     session_factory = get_session_factory()
     async with session_factory() as session:
@@ -39,6 +41,7 @@ async def get_incident(incident_id: str) -> IncidentPublic:
     )
 
 
+@allowlisted_tool("get_incident_timeline")
 async def get_incident_timeline(incident_id: str) -> list[Evidence]:
     """Chronological merge of every log/metric/deployment Evidence in this
     incident's search window (spec §10's get_incident_timeline() /

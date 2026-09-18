@@ -38,6 +38,18 @@ class Settings(BaseSettings):
     confidence_strong_threshold: float = 0.90
     confidence_review_threshold: float = 0.70
 
+    # spec §38-42 (Phase 8): per-tool-call timeout, a shared budget on how
+    # many tool calls one investigation may make (catches an agent stuck in
+    # a retry loop, or a future buggy/adversarial agent, before it can spin
+    # forever or hammer the database), and an overall wall-clock ceiling on
+    # a whole investigation. A real (non-LLM-touching) investigation today
+    # makes on the order of 40 tool calls end to end (measured by running
+    # one against the db_connection_pool scenario with audit logging on) —
+    # 100 leaves headroom for scenario growth without being unbounded.
+    tool_timeout_seconds: float = 10.0
+    max_tool_calls_per_investigation: int = 100
+    investigation_timeout_seconds: float = 120.0
+
     @property
     def database_url(self) -> str:
         return (

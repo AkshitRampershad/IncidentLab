@@ -39,6 +39,7 @@ export interface TriageFinding {
   investigation_targets: string[];
   initial_hypotheses: string[];
   summary: string;
+  degraded: boolean;
 }
 
 export interface HypothesisSignal {
@@ -52,6 +53,7 @@ export interface InvestigatorFinding {
   evidence: Evidence[];
   hypotheses_supported: HypothesisSignal[];
   summary: string;
+  degraded: boolean;
 }
 
 export interface Hypothesis {

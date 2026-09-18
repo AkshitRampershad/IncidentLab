@@ -1,4 +1,4 @@
-from agents.base import summarize_or_fallback
+from agents.base import format_evidence_for_prompt, summarize_or_fallback
 from agents.models import TimeWindow, TriageFinding
 from core.llm import LLMProvider
 from tools.deployments import get_recent_deployments
@@ -43,13 +43,16 @@ async def investigate(incident_id: str, llm: LLMProvider | None = None) -> Triag
         else "No deployments found near the incident window."
     )
 
-    prompt = (
-        f"Incident: {incident.description}\n"
-        f"Service: {incident.service}, severity: {incident.severity}\n"
-        f"Window: {incident.start_time.isoformat()} to {incident.end_time.isoformat()}\n"
-        f"Services active in window: {', '.join(investigation_targets)}\n"
-        "Deployments near the window:\n"
-        + "\n".join(f"- {d.source} at {d.timestamp.isoformat()}: {d.content}" for d in deployments)
+    prompt = format_evidence_for_prompt(
+        "incident",
+        [
+            f"Incident: {incident.description}",
+            f"Service: {incident.service}, severity: {incident.severity}",
+            f"Window: {incident.start_time.isoformat()} to {incident.end_time.isoformat()}",
+            f"Services active in window: {', '.join(investigation_targets)}",
+            "Deployments near the window:",
+            *(f"- {d.source} at {d.timestamp.isoformat()}: {d.content}" for d in deployments),
+        ],
     )
     summary = await summarize_or_fallback(
         llm, prompt=prompt, system=_SYSTEM_PROMPT, fallback=fallback

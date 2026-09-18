@@ -1,4 +1,4 @@
-from agents.base import summarize_or_fallback
+from agents.base import format_evidence_for_prompt, summarize_or_fallback
 from agents.models import HypothesisSignal, InvestigatorFinding
 from core.llm import LLMProvider
 from tools.deployments import get_recent_deployments
@@ -44,7 +44,7 @@ async def investigate(incident_id: str, llm: LLMProvider | None = None) -> Inves
     ]
 
     fallback = " ".join(findings)
-    prompt = "Deployments near the incident window:\n" + "\n".join(f"- {f}" for f in findings)
+    prompt = format_evidence_for_prompt("deployments", [f"- {f}" for f in findings])
     summary = await summarize_or_fallback(
         llm, prompt=prompt, system=_SYSTEM_PROMPT, fallback=fallback
     )

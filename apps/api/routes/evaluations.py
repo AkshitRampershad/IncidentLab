@@ -1,7 +1,7 @@
 from uuid import uuid4
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from core.llm import get_llm_provider
 from evaluation.runner import BenchmarkReport, run_benchmark
@@ -17,7 +17,14 @@ _EVALUATIONS: dict[str, BenchmarkReport] = {}
 
 
 class RunEvaluationRequest(BaseModel):
-    instances_per_scenario: int = 3
+    # spec §41's "oversized requests": each instance runs 3 architectures'
+    # worth of real DB writes and investigations, so an unbounded value
+    # here (e.g. a request for a million instances) is a real resource-
+    # exhaustion vector on a public endpoint, not just a slow response.
+    # 20 comfortably covers the documented default of 3 and any deliberate
+    # "run a bigger benchmark from the UI" use case; a genuinely large
+    # research run still has the uncapped `make benchmark` CLI.
+    instances_per_scenario: int = Field(default=3, ge=1, le=20)
     use_llm: bool = False
 
 

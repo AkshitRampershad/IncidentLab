@@ -1,4 +1,4 @@
-from agents.base import summarize_or_fallback
+from agents.base import format_evidence_for_prompt, summarize_or_fallback
 from agents.models import HypothesisSignal, InvestigatorFinding
 from core.llm import LLMProvider
 from tools.knowledge import search_historical_incidents, search_knowledge
@@ -32,8 +32,8 @@ async def investigate(incident_id: str, llm: LLMProvider | None = None) -> Inves
     hypotheses_supported: list[HypothesisSignal] = []
 
     fallback = " ".join(findings)
-    prompt = "Knowledge base matches:\n" + "\n".join(
-        f"- {e.source}: {e.content[:300]}" for e in evidence
+    prompt = format_evidence_for_prompt(
+        "knowledge", [f"- {e.source}: {e.content[:300]}" for e in evidence]
     )
     summary = await summarize_or_fallback(
         llm, prompt=prompt, system=_SYSTEM_PROMPT, fallback=fallback

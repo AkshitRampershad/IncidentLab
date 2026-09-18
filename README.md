@@ -2,14 +2,17 @@
 
 Open-source multi-agent incident investigation & evaluation lab.
 
-> **Status: Phase 7 of 10 (UI).** A web UI (`docker compose up`, then
-> http://localhost:3000) lets you generate an incident, run a full
-> investigation, and review the result without touching the CLI or
-> reading logs — plus a benchmark dashboard. Security hardening,
-> observability, and deployment tooling described below don't exist yet.
-> See `docs/IMPLEMENTATION_STATUS.md` for what's actually implemented
-> today, and don't take the rest of this README as a description of
-> current capability.
+> **Status: Phase 8 of 10 (Security + Observability).** A web UI
+> (`docker compose up`, then http://localhost:3000) lets you generate an
+> incident, run a full investigation, and review the result without
+> touching the CLI or reading logs — plus a benchmark dashboard. Tool
+> calls are now allowlisted, timed out, budgeted, and audit-logged
+> (`tools/registry.py`); one agent failing degrades gracefully instead of
+> crashing the whole investigation (spec §43); every `incident_id` is
+> validated before it reaches the database. Deployment tooling described
+> below doesn't exist yet. See `docs/IMPLEMENTATION_STATUS.md` for what's
+> actually implemented today, and don't take the rest of this README as a
+> description of current capability.
 
 ## What is IncidentLab?
 
@@ -133,11 +136,32 @@ dataset (short version: on 6 incidents, Single Agent ties Multi-Agent on
 accuracy but Multi-Agent shows better evidence recall — a genuine,
 non-rigged finding, not an assumed conclusion).
 
+## Security + Observability
+
+Every tool call an agent makes goes through `tools/registry.py`: an
+explicit allowlist, a per-call timeout, a shared per-investigation call
+budget, and a structured audit log line — see
+`docs/design-decisions.md` DDR-023. If one agent fails (a tool timeout, a
+DB hiccup, anything), the rest of the investigation still completes on
+whichever agents succeeded, with the failed one clearly marked
+`degraded` instead of crashing the whole run (DDR-024) — a nonexistent
+`incident_id` is the one case that still fails fast, since there'd be
+nothing left to investigate. Evidence passed into any LLM prompt is
+wrapped in an explicit untrusted-data delimiter (DDR-025), on top of the
+existing structural guarantee that no agent's actual conclusion ever
+depends on the LLM's response (DDR-010). `incident_id`s are validated
+against this project's own generated shape before they ever reach
+Postgres (DDR-027). Traces are real OpenTelemetry spans
+(`core/telemetry.py`) visible in process output — no collector is stood
+up yet (see Roadmap below).
+
 ## Roadmap
 
-Security, observability, and deployment sections will be filled in as
-each phase (see `docs/IMPLEMENTATION_STATUS.md`) actually ships — not
-written speculatively ahead of the code.
+Deployment tooling and the open-source release checklist will be filled
+in as each remaining phase (see `docs/IMPLEMENTATION_STATUS.md`) actually
+ships — not written speculatively ahead of the code. A real OTel
+collector (to visualize the traces above, not just print them) is one of
+the concrete gaps left.
 
 ## License
 

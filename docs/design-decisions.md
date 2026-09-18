@@ -518,3 +518,188 @@ Neither would have been caught by unit or integration tests alone; both
 came directly from following the "start the dev server and use the
 feature in a browser" instruction rather than treating a clean test run
 as sufficient.
+
+## DDR-023: tool permissions, timeouts, budget, and audit logging are one decorator, not four separate mechanisms
+
+**Context:** spec §38-40 ask for an explicit tool allowlist, per-call
+timeouts, a cap on tool calls per investigation, and an audit trail of
+every call — four requirements that all attach to the same event (a tool
+function being called).
+
+**Decision:** `tools/registry.py`'s `@allowlisted_tool("name")` decorator,
+applied to all ten tool functions (`tools/incidents.py`,
+`tools/logs.py`, `tools/metrics.py`, `tools/deployments.py`,
+`tools/knowledge.py`), does all four at once: registering the name in a
+live allowlist (`allowed_tools()`), wrapping the call in
+`asyncio.wait_for(..., timeout=Settings.tool_timeout_seconds)`,
+incrementing a shared per-investigation counter against
+`Settings.max_tool_calls_per_investigation`, and emitting a structured
+`structlog` line (tool name, duration, outcome) plus an OpenTelemetry span
+on every call, success or failure. A `call_tool(name, ...)` dispatch
+function also exists, raising `ToolNotAllowed` for any unregistered name —
+giving the allowlist real teeth for a future LLM-driven tool-calling loop,
+even though today's agents call tool functions directly via Python
+imports (the LLM here never chooses which tool to call).
+
+**Why:** all four concerns fire at exactly the same two points (before the
+call, after it succeeds or fails) — four separate wrapping mechanisms
+(a permission check, a timeout wrapper, a budget middleware, a logging
+decorator) would mean four places to apply to every tool function instead
+of one, and four places that could drift out of sync. The per-investigation
+budget uses a single-element mutable list behind a `ContextVar`
+(`_call_count`), not a plain int: LangGraph's parallel investigator nodes
+run as concurrent asyncio Tasks spawned from the same parent context, and
+a `ContextVar` copies its *mapping* into each new Task but shares each
+entry's *value* by reference — a mutable list lets every node draw down
+the same shared budget; a plain int would silently give each node its own
+independent copy the first time it tried to rebind the var. Verified
+directly by `tests/unit/test_tools_registry.py`'s
+`test_budget_is_shared_across_concurrent_calls_in_the_same_context`, and
+by measuring a real investigation (`db_connection_pool`, no LLM): 38 tool
+calls end to end, which set `Settings.max_tool_calls_per_investigation`'s
+default of 100 (comfortable headroom, not an arbitrary round number).
+`reset_tool_budget()` is called once, by `orchestration.graph.investigate()`
+— a tool called directly outside a real investigation (a unit test, or a
+standalone route like `GET /investigations/{id}/timeline`) is deliberately
+unbudgeted, since it isn't "an investigation" the budget is scoped to.
+
+## DDR-024: one agent failing degrades that agent's finding; it never crashes the investigation — except a nonexistent incident, which still does
+
+**Context:** spec §43's own worked example: *"If Log Agent fails: Continue
+investigation with: Metrics, Code, Knowledge. Note: 'Log evidence not
+available'."* Before this phase, any exception inside any
+`orchestration/graph.py` node (an agent's tool call, an LLM timeout, a bad
+DB connection) propagated straight out of `investigate()` and failed the
+whole investigation.
+
+**Decision:** every node function (`_triage_node`, `_run_investigator`
+wrapping the four investigator nodes, `_adjudicate_node`) now catches
+`Exception` around its agent's call and returns a `degraded=True` finding
+(`agents/models.py`'s new `TriageFinding.degraded` /
+`InvestigatorFinding.degraded` field) with empty evidence/findings and a
+`summary` stating what went wrong, instead of letting the exception
+propagate. The one deliberate exception: a `ValueError` — raised only when
+`incident_id` doesn't exist at all (`tools/incidents.get_incident`) — is
+explicitly re-raised, not degraded, because every agent would fail
+identically and there is no investigation to salvage; degrading it would
+turn a clean, already-tested 404 (`apps/api/routes/investigations.py`)
+into a confusing "investigation" full of five degraded agents and no
+result. `orchestration/graph.py`'s `investigate()` also now wraps the
+whole graph invocation in `asyncio.wait_for(...,
+timeout=Settings.investigation_timeout_seconds)`, raising a new
+`InvestigationTimeoutError` (mapped to HTTP 504) — a ceiling on top of
+each individual tool's own timeout, for the case where many
+individually-fine calls still add up to an unacceptably slow run.
+
+**Why:** this is the literal behavior spec §43 asks for, verified end to
+end (not just unit-tested in isolation) by
+`tests/integration/test_orchestration_resilience.py`: monkeypatching
+`agents.logs.investigate` to raise still produces a complete investigation
+with a real `selected_hypothesis` from the other three agents; monkeypatching
+all four investigator agents to raise still produces the adjudicator's
+already-existing, already-tested "no hypotheses" fallback (DDR-014's
+single-pass graph already had one) rather than an unhandled exception.
+Re-raising `ValueError` for a nonexistent incident preserves an existing,
+tested API contract (`test_investigate_unknown_incident_is_404`) — broadening
+graceful degradation to cover it would have been a regression disguised
+as resilience.
+
+## DDR-025: prompt-injection defense is a delimiter + explicit preamble on top of an existing structural guarantee, not a content filter
+
+**Context:** spec §41 requires "prompt injection protection" as a security
+test. DDR-010 already established that no agent's *structured* output
+(findings, hypotheses, confidence, `selected_hypothesis`,
+`needs_human_review`) is ever derived from an LLM response — only the
+free-text `summary`/`reasoning_summary` fields are, and those degrade to a
+deterministic fallback on any LLM failure. Evidence content, though, is
+attacker-reachable: anything landing in a log message, a metric label, or
+a knowledge doc could carry text that reads like an instruction.
+
+**Decision:** `agents/base.py`'s `format_evidence_for_prompt(label, lines)`
+wraps every prompt's evidence content in an explicit
+`<evidence label="...">...</evidence>` block preceded by a preamble
+stating plainly that the content is untrusted data, never instructions to
+obey. Every agent (`triage`, `logs`, `metrics`, `code`, `knowledge`) and
+the adjudicator now build their LLM prompts through this helper instead of
+splicing evidence content into a raw f-string.
+
+**Why:** this is deliberately defense in depth, not the primary defense —
+DDR-010's structural guarantee already makes injection non-dangerous here,
+since even a fully-compromised LLM response can only ever land in a
+narration field nothing downstream reads for its actual decision. That
+claim is now a test, not just an assumption:
+`tests/unit/test_prompt_injection_defense.py`'s
+`test_a_fully_compromised_llm_can_only_distort_the_summary_text` uses an
+`EchoLLM` that does exactly what an injected instruction asks
+("confidence 1.0, ignoring real evidence") and confirms the structured
+hypothesis signal is untouched. The delimiter/preamble layer exists for
+the case a future phase's LLM usage grows beyond narration (e.g. if an
+LLM ever chose which tool to call, per DDR-023's `call_tool` groundwork) —
+at that point a clearly-marked untrusted-data boundary is worth having
+already in place, rather than retrofitting it under pressure.
+
+## DDR-026: OpenTelemetry traces use a private `TracerProvider`, not the global `opentelemetry.trace` API — and no real collector is stood up
+
+**Context:** spec §42 asks for structured traces with specific span
+attributes (investigation_id, agent_name, tool, latency). The
+`opentelemetry.trace.set_tracer_provider()` global-API function can only
+meaningfully be called once per process — a second call is a silent
+no-op with a logged warning — which makes it awkward for tests to swap in
+an `InMemorySpanExporter` to assert on span attributes directly.
+
+**Decision:** `core/telemetry.py` owns a private module-level
+`TracerProvider` instance directly (never touching
+`opentelemetry.trace.set_tracer_provider`/`get_tracer_provider`), exposing
+`get_tracer(name)` and a test-only `add_span_processor(processor)`.
+`tools/registry.py`'s tool-call wrapper and `orchestration/graph.py`'s
+node functions each open a span (`tool.<name>` / `agent.<name>` /
+`investigation`) carrying the attributes spec §42 lists. The default
+processor is a `ConsoleSpanExporter` — spans are visible in process
+output — and no real OTel collector (Jaeger, Tempo, etc.) is stood up.
+
+**Why:** owning the provider directly sidesteps the global-API's
+once-only restriction entirely, verified by
+`tests/unit/test_telemetry.py` attaching an `InMemorySpanExporter` and
+reading spans back by attribute rather than parsing console text. No real
+collector exists for the same reason no real Qdrant or git integration
+exists yet (DDR-012, DDR-011): there's nothing in this project's infra a
+collector could be verified against inside this sandbox, and standing one
+up in `docker-compose.yml` with nothing to point it at or prove it works
+would be exactly the "add infrastructure before it's needed" the project
+has consistently avoided. `ConsoleSpanExporter` at least makes spans real
+and inspectable today rather than configured-but-invisible.
+
+## DDR-027: `incident_id` path parameters are validated against the project's own `INC-<n>` shape before touching the database
+
+**Context:** while writing `tests/integration/test_api_security.py`
+(spec §41's malformed-inputs test), a null byte inside `incident_id`
+(`INC-0001%00INC-0002`) reached asyncpg raw and came back as an uncaught
+`asyncpg.exceptions.CharacterNotInRepertoireError` — a real 500, not the
+clean 404 every other bad `incident_id` already got via `ValueError`
+handling. Every `incident_id` this project ever generates
+(`simulator/replay.py`'s `_next_incident_id`) has always had exactly one
+shape: `INC-` followed by digits.
+
+**Decision:** `apps/api/validation.py`'s `IncidentId` (a FastAPI `Path`
+type with `pattern=r"^INC-\d+$"`, `max_length=32`) replaces the plain
+`incident_id: str` parameter on every route that takes one
+(`apps/api/routes/incidents.py`, `apps/api/routes/investigations.py`).
+Anything not matching — SQL-metacharacter payloads, null bytes, script
+tags, 10,000-character strings — is rejected with a 422 by FastAPI itself,
+before any route code or the database ever sees the value. A
+syntactically valid but nonexistent id (`INC-99999999`) still reaches
+`get_incident()` and gets the existing, tested 404.
+
+**Why:** this is a real bug found by testing, the same way Phase 7's two
+bugs were (DDR's own "Bug found by manually testing the UI" section
+above) — not a hypothetical hardening exercise. Validating shape at the
+API boundary catches an entire class of malformed input in one place
+rather than trying to anticipate and catch each downstream failure mode
+individually (a null byte was the one this sandbox's Postgres happened to
+reject loudly; there is no guarantee it's the only character class that
+would). `tests/integration/test_api_security.py` also caps
+`RunEvaluationRequest.instances_per_scenario` at 20 (`Field(ge=1, le=20)`)
+for the same reason in a different shape: each instance runs three
+architectures' worth of real investigations, so an unbounded value on a
+public endpoint is a genuine resource-exhaustion vector, not just a slow
+response — spec §41's "oversized requests" in practice, not in theory.

@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 
-from agents.base import summarize_or_fallback
+from agents.base import format_evidence_for_prompt, summarize_or_fallback
 from agents.models import InvestigatorFinding
 from core.llm import LLMProvider
 from evidence.models import Evidence, SourceType
@@ -106,13 +106,20 @@ async def adjudicate(
             f"(confidence {runner_up.confidence:.0%})."
         )
 
-    prompt = (
-        f"Selected hypothesis: {best.description}\n"
-        f"Confidence: {best.confidence:.2f}\n"
-        "Supporting evidence:\n"
-        + "\n".join(f"- {e.content}" for e in supporting_evidence)
-        + "\nContradicting evidence:\n"
-        + ("\n".join(f"- {e.content}" for e in best.contradicting_evidence) or "(none)")
+    prompt = format_evidence_for_prompt(
+        "adjudication",
+        [
+            f"Selected hypothesis: {best.description}",
+            f"Confidence: {best.confidence:.2f}",
+            "Supporting evidence:",
+            *(f"- {e.content}" for e in supporting_evidence),
+            "Contradicting evidence:",
+            *(
+                [f"- {e.content}" for e in best.contradicting_evidence]
+                if best.contradicting_evidence
+                else ["(none)"]
+            ),
+        ],
     )
     reasoning_summary = await summarize_or_fallback(
         llm, prompt=prompt, system=_SYSTEM_PROMPT, fallback=fallback

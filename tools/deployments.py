@@ -6,6 +6,7 @@ from evidence.models import Evidence, SourceType
 from evidence.provenance import build_evidence_id, build_provenance
 from evidence.scoring import SEARCH_WINDOW_PADDING, temporal_relevance
 from tools.incidents import get_incident
+from tools.registry import allowlisted_tool
 
 
 def _to_evidence(row: DeploymentRecord, *, relevance: float) -> Evidence:
@@ -22,6 +23,7 @@ def _to_evidence(row: DeploymentRecord, *, relevance: float) -> Evidence:
     )
 
 
+@allowlisted_tool("get_recent_deployments")
 async def get_recent_deployments(incident_id: str) -> list[Evidence]:
     """spec §10/§13's get_recent_deployments(): deployments in a padded
     window before/after the incident, across every service (not just the

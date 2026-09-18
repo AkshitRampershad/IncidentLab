@@ -403,3 +403,75 @@ real headless browser (Playwright), not just `npm run build` — screens
 captured at each step of generate → investigate → review → benchmark.
 That's what caught both bugs `docs/design-decisions.md` closes with;
 neither showed up in `npm run build`, `pytest`, or a code read.
+
+## Phase 8: Security + Observability
+
+```mermaid
+flowchart LR
+    agent[agent code] -->|"@allowlisted_tool"| registry[tools/registry.py]
+    registry -->|"budget + timeout + audit log"| tool[actual tool function]
+    registry -->|span| tel[core/telemetry.py<br/>TracerProvider]
+    tel -->|ConsoleSpanExporter<br/>default| stdout[(process output)]
+
+    node[orchestration/graph.py<br/>node functions] -->|"try/except -> degraded finding"| state[InvestigationState]
+    node -->|span| tel
+    graph_fn[investigate] -->|"asyncio.wait_for"| timeout_err[InvestigationTimeoutError]
+
+    req["API request<br/>(incident_id path param)"] -->|"apps/api/validation.py<br/>IncidentId pattern"| route[route handler]
+```
+
+- **`tools/registry.py`** — spec §38-40's tool permission layer, applied
+  as one decorator (`@allowlisted_tool("name")`) to all ten tool functions
+  rather than four separate mechanisms (DDR-023): a live allowlist
+  (`allowed_tools()`, `call_tool()` dispatch raising `ToolNotAllowed` for
+  an unregistered name), a per-call `asyncio.wait_for(...,
+  Settings.tool_timeout_seconds)`, a shared per-investigation call budget
+  (`Settings.max_tool_calls_per_investigation`, default 100 — a real
+  investigation measures 38 calls end to end), and a structured
+  `structlog` audit log line plus an OpenTelemetry span on every call.
+  The budget is shared across LangGraph's parallel investigator nodes via
+  a mutable single-element list behind a `ContextVar` (DDR-023 explains
+  why a plain int wouldn't work). `reset_tool_budget()` is called once,
+  by `orchestration.graph.investigate()` — a tool called outside a real
+  investigation is deliberately unbudgeted.
+- **`core/telemetry.py`** — spec §42's structured traces. Owns a private
+  `TracerProvider` directly rather than going through
+  `opentelemetry.trace`'s global (once-only) API (DDR-026), defaulting to
+  a `ConsoleSpanExporter` — spans are real and inspectable in process
+  output, but no OTel collector is stood up (same reasoning as never
+  standing up Qdrant — DDR-012 — nothing in this project's infra exists
+  for one to be verified against here). `tools/registry.py` and
+  `orchestration/graph.py` both open spans carrying spec §42's listed
+  attributes (`incident_id`, `agent_name`/`tool`, duration, outcome).
+- **`orchestration/graph.py`** — graceful degradation (DDR-024, spec
+  §43's own worked example): every node catches its agent's exceptions
+  and returns a `degraded=True` finding (`agents/models.py`'s new field)
+  instead of crashing the whole graph — except a nonexistent
+  `incident_id` (`ValueError`), which still fails the whole investigation
+  since every agent would fail identically. `investigate()` also enforces
+  `Settings.investigation_timeout_seconds` as an overall ceiling
+  (`InvestigationTimeoutError`, mapped to HTTP 504), on top of each tool
+  call's own timeout.
+- **`agents/base.py`** — `format_evidence_for_prompt()`, spec §41's
+  prompt-injection defense in depth (DDR-025) on top of the structural
+  guarantee DDR-010 already provides: every agent's LLM prompt wraps
+  evidence content in an explicit `<evidence label="...">` block with a
+  preamble stating it's untrusted data, never instructions.
+- **`apps/api/validation.py`** — `IncidentId`, a FastAPI `Path` type
+  constraining every route's `incident_id` parameter to this project's
+  own `INC-<n>` shape (DDR-027) — found and fixed a real bug where a null
+  byte reached asyncpg raw and came back as an uncaught 500.
+  `apps/api/routes/evaluations.py`'s `RunEvaluationRequest.
+  instances_per_scenario` is similarly capped at 20 — spec §41's
+  "oversized requests" in practice (each instance runs three
+  architectures' worth of real investigations).
+
+Verified with `tests/integration/test_orchestration_resilience.py`
+(monkeypatching real agent functions to raise, confirming the rest of the
+investigation still completes) and `tests/integration/test_api_security.py`
+(SQL-injection-shaped, null-byte, oversized, and malformed inputs against
+the real API — all reach a clean 4xx, never a 500), plus
+`tests/unit/test_tools_registry.py`, `test_prompt_injection_defense.py`,
+and `test_telemetry.py`. Measured directly, not assumed: a real
+`db_connection_pool` investigation makes 38 tool calls end to end with no
+LLM configured.

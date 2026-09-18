@@ -1,4 +1,4 @@
-from agents.base import hypotheses_from_content, summarize_or_fallback
+from agents.base import format_evidence_for_prompt, hypotheses_from_content, summarize_or_fallback
 from agents.models import InvestigatorFinding
 from core.llm import LLMProvider
 from tools.logs import find_error_spikes, search_logs
@@ -33,8 +33,8 @@ async def investigate(incident_id: str, llm: LLMProvider | None = None) -> Inves
         pattern_text = "; ".join(s.hypothesis for s in hypotheses_supported)
         fallback += f" Patterns observed: {pattern_text}."
 
-    prompt = "Log evidence:\n" + "\n".join(
-        f"- [{e.timestamp.isoformat()}] {e.content}" for e in evidence
+    prompt = format_evidence_for_prompt(
+        "logs", [f"- [{e.timestamp.isoformat()}] {e.content}" for e in evidence]
     )
     summary = await summarize_or_fallback(
         llm, prompt=prompt, system=_SYSTEM_PROMPT, fallback=fallback

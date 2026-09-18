@@ -18,6 +18,12 @@ class TriageFinding(BaseModel):
     investigation_targets: list[str]
     initial_hypotheses: list[str]
     summary: str
+    # spec §43's graceful-degradation example ("if Log Agent fails,
+    # continue with the rest"): set by orchestration/graph.py when this
+    # agent raised (a tool timeout, budget exhaustion, DB error, etc.)
+    # instead of crashing the whole investigation. False for every normal
+    # finding produced by the agent itself.
+    degraded: bool = False
 
 
 class HypothesisSignal(BaseModel):
@@ -39,3 +45,5 @@ class InvestigatorFinding(BaseModel):
     evidence: list[Evidence]
     hypotheses_supported: list[HypothesisSignal]
     summary: str
+    # See TriageFinding.degraded above — same meaning, same mechanism.
+    degraded: bool = False

@@ -10,6 +10,7 @@ from evidence.models import Evidence, SourceType
 from evidence.provenance import build_evidence_id, build_provenance
 from evidence.scoring import SEARCH_WINDOW_PADDING, matches_query, temporal_relevance
 from tools.incidents import get_incident
+from tools.registry import allowlisted_tool
 
 _SPIKE_THRESHOLD = 3  # error-level logs in one minute bucket to call it a spike
 
@@ -36,6 +37,7 @@ def _to_evidence(row: LogEventRecord, *, relevance: float) -> Evidence:
     )
 
 
+@allowlisted_tool("search_logs")
 async def search_logs(incident_id: str, query: str | None = None) -> list[Evidence]:
     """spec §11's search_logs(): every log for this incident's service, in
     a padded window around start/end, optionally filtered by a
@@ -65,6 +67,7 @@ async def search_logs(incident_id: str, query: str | None = None) -> list[Eviden
     return evidence
 
 
+@allowlisted_tool("find_error_spikes")
 async def find_error_spikes(incident_id: str) -> list[LogSpike]:
     """spec §11's find_error_spikes(): minute-bucketed error-level log
     counts, only buckets at or above `_SPIKE_THRESHOLD`."""

@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import select
 
+from apps.api.validation import IncidentId
 from core.db import get_session_factory
 from core.models import IncidentRecord
 from simulator.replay import run_scenario
@@ -32,7 +33,7 @@ async def list_incidents() -> list[IncidentPublic]:
 
 
 @router.get("/incidents/{incident_id}", response_model=IncidentPublic)
-async def get_incident_route(incident_id: str) -> IncidentPublic:
+async def get_incident_route(incident_id: IncidentId) -> IncidentPublic:
     try:
         return await get_incident(incident_id)
     except ValueError as exc:

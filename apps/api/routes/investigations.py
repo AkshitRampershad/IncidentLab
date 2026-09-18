@@ -3,9 +3,11 @@ from pydantic import BaseModel
 
 from agents.adjudicator import AdjudicationResult
 from agents.models import InvestigatorFinding, TriageFinding
+from apps.api.validation import IncidentId
 from core.llm import get_llm_provider
 from evidence.models import Evidence
 from hypotheses.models import Hypothesis
+from orchestration.graph import InvestigationTimeoutError
 from orchestration.graph import investigate as run_investigation
 from tools.incidents import get_incident_timeline
 
@@ -32,6 +34,8 @@ async def _run(incident_id: str, use_llm: bool) -> InvestigationResponse:
         state = await run_investigation(incident_id, llm=llm)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except InvestigationTimeoutError as exc:
+        raise HTTPException(status_code=504, detail=str(exc)) from exc
 
     return InvestigationResponse(
         incident_id=incident_id,
@@ -49,14 +53,14 @@ async def _run(incident_id: str, use_llm: bool) -> InvestigationResponse:
 
 @router.post("/incidents/{incident_id}/investigate", response_model=InvestigationResponse)
 async def investigate_incident(
-    incident_id: str, use_llm: bool = Query(False, alias="llm")
+    incident_id: IncidentId, use_llm: bool = Query(False, alias="llm")
 ) -> InvestigationResponse:
     return await _run(incident_id, use_llm)
 
 
 @router.get("/investigations/{incident_id}", response_model=InvestigationResponse)
 async def get_investigation(
-    incident_id: str, use_llm: bool = Query(False, alias="llm")
+    incident_id: IncidentId, use_llm: bool = Query(False, alias="llm")
 ) -> InvestigationResponse:
     """Re-runs the investigation fresh rather than reading a persisted
     record — the system is deterministic (no ground truth or randomness
@@ -69,7 +73,7 @@ async def get_investigation(
 
 
 @router.get("/investigations/{incident_id}/timeline", response_model=list[Evidence])
-async def get_investigation_timeline(incident_id: str) -> list[Evidence]:
+async def get_investigation_timeline(incident_id: IncidentId) -> list[Evidence]:
     try:
         return await get_incident_timeline(incident_id)
     except ValueError as exc:
@@ -78,7 +82,7 @@ async def get_investigation_timeline(incident_id: str) -> list[Evidence]:
 
 @router.get("/investigations/{incident_id}/evidence", response_model=list[Evidence])
 async def get_investigation_evidence(
-    incident_id: str, use_llm: bool = Query(False, alias="llm")
+    incident_id: IncidentId, use_llm: bool = Query(False, alias="llm")
 ) -> list[Evidence]:
     result = await _run(incident_id, use_llm)
     return result.adjudication.supporting_evidence
@@ -86,7 +90,7 @@ async def get_investigation_evidence(
 
 @router.get("/investigations/{incident_id}/hypotheses", response_model=list[Hypothesis])
 async def get_investigation_hypotheses(
-    incident_id: str, use_llm: bool = Query(False, alias="llm")
+    incident_id: IncidentId, use_llm: bool = Query(False, alias="llm")
 ) -> list[Hypothesis]:
     result = await _run(incident_id, use_llm)
     return result.hypotheses
@@ -94,7 +98,7 @@ async def get_investigation_hypotheses(
 
 @router.get("/investigations/{incident_id}/agents", response_model=dict[str, InvestigatorFinding])
 async def get_investigation_agents(
-    incident_id: str, use_llm: bool = Query(False, alias="llm")
+    incident_id: IncidentId, use_llm: bool = Query(False, alias="llm")
 ) -> dict[str, InvestigatorFinding]:
     result = await _run(incident_id, use_llm)
     return result.agents
@@ -114,10 +118,10 @@ _REVIEW_NOTE = (
 
 
 @router.post("/investigations/{incident_id}/approve", response_model=ReviewDecision)
-async def approve_investigation(incident_id: str) -> ReviewDecision:
+async def approve_investigation(incident_id: IncidentId) -> ReviewDecision:
     return ReviewDecision(status="approved", incident_id=incident_id, note=_REVIEW_NOTE)
 
 
 @router.post("/investigations/{incident_id}/reject", response_model=ReviewDecision)
-async def reject_investigation(incident_id: str) -> ReviewDecision:
+async def reject_investigation(incident_id: IncidentId) -> ReviewDecision:
     return ReviewDecision(status="rejected", incident_id=incident_id, note=_REVIEW_NOTE)

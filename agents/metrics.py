@@ -1,4 +1,4 @@
-from agents.base import summarize_or_fallback
+from agents.base import format_evidence_for_prompt, summarize_or_fallback
 from agents.models import HypothesisSignal, InvestigatorFinding
 from core.llm import LLMProvider
 from tools.metrics import detect_anomaly, known_anomaly_metrics, query_metrics
@@ -36,8 +36,8 @@ async def investigate(incident_id: str, llm: LLMProvider | None = None) -> Inves
         findings.append("No metrics crossed a known anomaly threshold in the incident window.")
 
     fallback = " ".join(findings)
-    prompt = "Metric evidence:\n" + "\n".join(
-        f"- [{e.timestamp.isoformat()}] {e.content}" for e in evidence
+    prompt = format_evidence_for_prompt(
+        "metrics", [f"- [{e.timestamp.isoformat()}] {e.content}" for e in evidence]
     )
     summary = await summarize_or_fallback(
         llm, prompt=prompt, system=_SYSTEM_PROMPT, fallback=fallback

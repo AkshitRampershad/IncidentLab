@@ -7,7 +7,7 @@
 - [x] Phase 5 — Orchestration
 - [x] Phase 6 — Evaluation
 - [x] Phase 7 — UI
-- [ ] Phase 8 — Security + Observability
+- [x] Phase 8 — Security + Observability
 - [ ] Phase 9 — Deployment
 - [ ] Phase 10 — Open Source Release
 
@@ -769,3 +769,163 @@ read.
   this phase in CI; it was a one-time manual verification.
 
 **Next phase:** Phase 8 — Security + Observability.
+
+---
+
+## Phase 8 — Security + Observability
+
+**Implemented:**
+- `tools/registry.py` — spec §38-40's tool permission layer as one
+  decorator (`@allowlisted_tool`) applied to all ten tool functions
+  (`tools/incidents.py`, `tools/logs.py`, `tools/metrics.py`,
+  `tools/deployments.py`, `tools/knowledge.py`), rather than four separate
+  mechanisms — see DDR-023:
+  - A live allowlist (`allowed_tools()`) and a `call_tool(name, ...)`
+    dispatch function raising `ToolNotAllowed` for any unregistered name.
+  - A per-call timeout (`asyncio.wait_for`, `Settings.tool_timeout_seconds`,
+    default 10s), raising `ToolTimeoutError`.
+  - A shared per-investigation call budget
+    (`Settings.max_tool_calls_per_investigation`, default 100), enforced
+    via a mutable counter behind a `ContextVar` so it's correctly shared
+    across LangGraph's parallel investigator nodes; raises
+    `ToolBudgetExceededError`. Reset once per investigation by
+    `orchestration.graph.investigate()`.
+  - A structured `structlog` audit log line (tool, duration, outcome) and
+    an OpenTelemetry span on every call, satisfying spec §39's audit
+    trail and §42's observability with one mechanism.
+- `core/telemetry.py` — spec §42's structured traces: a private
+  `TracerProvider` (not the global `opentelemetry.trace` API, which only
+  allows being set once per process — DDR-026), defaulting to a
+  `ConsoleSpanExporter`. No real collector stood up (same reasoning as
+  never standing up Qdrant, DDR-012).
+- `orchestration/graph.py` — graceful degradation (DDR-024, spec §43's
+  own worked example): every node (`triage`, the four investigators,
+  `adjudicate`) catches its agent's exceptions and returns a
+  `degraded=True` finding instead of crashing the whole investigation,
+  except a nonexistent `incident_id` (`ValueError`), which still fails
+  fast — every agent would fail identically and there's no investigation
+  to salvage. `investigate()` now enforces an overall
+  `Settings.investigation_timeout_seconds` ceiling
+  (`InvestigationTimeoutError`, mapped to HTTP 504 in
+  `apps/api/routes/investigations.py`) on top of each tool's own timeout.
+- `agents/models.py` — `TriageFinding.degraded` /
+  `InvestigatorFinding.degraded` (default `False`), mirrored in
+  `apps/web/lib/types.ts` and surfaced as a "degraded" badge in the
+  investigation console instead of the usual success checkmark.
+- `agents/base.py` — `format_evidence_for_prompt()`, spec §41's
+  prompt-injection defense in depth on top of DDR-010's existing
+  structural guarantee (DDR-025): every agent and the adjudicator now
+  build LLM prompts through this helper, which wraps evidence content in
+  an explicit `<evidence label="...">` block with an untrusted-data
+  preamble.
+- `apps/api/validation.py` — `IncidentId`, a FastAPI `Path` type
+  constraining every route's `incident_id` parameter to this project's
+  own `INC-<n>` shape (DDR-027) — found and fixed a real bug (a null byte
+  reaching asyncpg raw and coming back as an uncaught 500). Applied across
+  `apps/api/routes/incidents.py` and `investigations.py`.
+- `apps/api/routes/evaluations.py` — `RunEvaluationRequest.
+  instances_per_scenario` capped at 20 (`Field(ge=1, le=20)`) — spec
+  §41's "oversized requests" in practice: each instance runs three
+  architectures' worth of real investigations.
+- `core/config.py` — `tool_timeout_seconds` (10.0),
+  `max_tool_calls_per_investigation` (100, validated against a real
+  measured investigation — see below), `investigation_timeout_seconds`
+  (120.0).
+- `opentelemetry-api`/`opentelemetry-sdk` added as main dependencies.
+- `docs/architecture.md` (Phase 8 slice) and `docs/design-decisions.md`
+  (DDR-023 through DDR-027).
+
+**Files changed:** `tools/registry.py` (new), `core/telemetry.py` (new),
+`apps/api/validation.py` (new), `core/config.py`, `orchestration/graph.py`,
+`agents/models.py`, `agents/base.py`, `agents/triage.py`, `agents/logs.py`,
+`agents/metrics.py`, `agents/code.py`, `agents/knowledge.py`,
+`agents/adjudicator.py`, `tools/incidents.py`, `tools/logs.py`,
+`tools/metrics.py`, `tools/deployments.py`, `tools/knowledge.py`,
+`apps/api/routes/incidents.py`, `apps/api/routes/investigations.py`,
+`apps/api/routes/evaluations.py`, `apps/web/lib/types.ts`,
+`apps/web/app/incidents/[id]/page.tsx`, `pyproject.toml`, plus five new
+test files (below), `docs/architecture.md`, `docs/design-decisions.md`.
+
+**Tests added:**
+- Unit: `test_tools_registry.py` (allowlist registration, `call_tool`
+  dispatch and its `ToolNotAllowed` rejection, unbudgeted calls outside an
+  investigation context, budget enforcement and its concurrent-sharing
+  behavior, timeout enforcement, structured audit logs on both success and
+  failure). `test_prompt_injection_defense.py` (delimiter wrapping,
+  untrusted-data framing, deterministic hypothesis matching is unaffected
+  by an injection payload, and — the sharpest version of the claim — a
+  fully-compromised `EchoLLM` that does exactly what an injected
+  instruction says can still only distort the `summary` field, never the
+  structured signal). `test_telemetry.py` (real spans with real
+  attributes via an attached `InMemorySpanExporter`).
+- Integration (real Postgres): `test_orchestration_resilience.py` —
+  monkeypatches real agent functions (`agents.logs.investigate`,
+  `agents.triage.investigate`, all four investigators at once) to raise,
+  confirming the rest of the investigation still completes with a real
+  result, and that a nonexistent incident still raises `ValueError`
+  rather than degrading; a slow triage agent is actually cancelled by
+  `Settings.investigation_timeout_seconds`. `test_api_security.py` —
+  SQL-injection-shaped, null-byte, path-traversal, script-tag, and
+  10,000-character `incident_id`s; malformed/oversized/missing JSON
+  bodies; an oversized/negative/zero `instances_per_scenario`; confirms
+  every one reaches a clean 4xx and never disturbs a real incident.
+
+**Commands actually run in this session, with real output:**
+```
+uv add opentelemetry-api opentelemetry-sdk   # resolved cleanly, 3 packages
+uv run pytest -q             # 182 passed (50 new for Phase 8), against
+                              # the same real local Postgres as every
+                              # prior phase
+uv run ruff check .          # All checks passed!
+uv run ruff format --check . # clean (one file auto-reformatted along
+                              # the way)
+```
+Also measured a real investigation's actual tool-call volume directly
+(not guessed): `db_connection_pool`, no LLM configured — **38 tool calls**
+end to end, which is what set `max_tool_calls_per_investigation`'s default
+of 100 (comfortable headroom, not an arbitrary round number). Console span
+output was captured and inspected during that run — real
+`tool.<name>`/`agent.<name>`/`investigation` spans with real
+`incidentlab.*` attributes (tool name, incident_id, outcome,
+duration_seconds), not just asserted to exist.
+
+**A real bug found while writing this phase's own security tests (not
+reviewed in beforehand):** a null byte inside `incident_id`
+(`INC-0001%00INC-0002`) reached asyncpg raw and came back as an uncaught
+`asyncpg.exceptions.CharacterNotInRepertoireError` — a 500, not the clean
+404 every other malformed id already got. Fixed with
+`apps/api/validation.py`'s `IncidentId` path-pattern constraint
+(`^INC-\d+$`) rather than trying to catch every downstream failure mode
+one at a time — see DDR-027. Same pattern as both Phase 7 bugs: found by
+actually exercising the system adversarially, not by code review.
+
+**Known limitations:**
+- No real OTel collector (Jaeger, Tempo, etc.) is stood up — spans are
+  real and inspectable via `ConsoleSpanExporter`/`InMemorySpanExporter`
+  (tests), but nothing in `docker-compose.yml` visualizes them yet. Same
+  reasoning as never standing up Qdrant (DDR-012): nothing in this
+  project's infra exists for a collector to be verified against here.
+- The tool-call budget and timeouts are per-investigation defaults tuned
+  against this project's one well-measured scenario (38 calls); they
+  haven't been stress-tested against a pathological/adversarial tool
+  (e.g. one that hangs just under the timeout on every call) — the
+  mechanism is tested directly (`test_tools_registry.py`), but not that
+  specific failure shape end to end.
+- `call_tool()`'s name-based dispatch exists for a future LLM-driven
+  tool-calling loop but has no real caller yet — today's agents still
+  call tool functions directly via Python imports, since the LLM here
+  never chooses which tool to call. Groundwork, not a currently-exercised
+  path.
+- Prompt-injection defense is structural + a labeled delimiter, not a
+  content filter or classifier — deliberately, since DDR-010's existing
+  guarantee already makes the structured output immune; a content filter
+  would be defending a surface (`summary`/`reasoning_summary` prose) that
+  was already understood to be low-stakes narration, not the
+  investigation's actual conclusion.
+- No rate limiting or auth exists at the API layer — this phase hardens
+  against malformed/oversized/adversarial *content*, not against a
+  high-volume or unauthenticated *caller*; still explicitly out of scope
+  per the project's local-first, no-auth-yet posture (Phase 1's own known
+  limitations).
+
+**Next phase:** Phase 9 — Deployment.

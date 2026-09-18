@@ -130,7 +130,11 @@ export default function IncidentPage() {
                 <div className="agent-card" key={key}>
                   <div className="row" style={{ justifyContent: "space-between", marginBottom: 8 }}>
                     <strong>{AGENT_LABELS[key] ?? key}</strong>
-                    <span className="badge badge-success">✓</span>
+                    {finding.degraded ? (
+                      <span className="badge badge-warning">degraded</span>
+                    ) : (
+                      <span className="badge badge-success">✓</span>
+                    )}
                   </div>
                   <ul style={{ margin: 0, paddingLeft: 18 }}>
                     {finding.findings.map((f, i) => (

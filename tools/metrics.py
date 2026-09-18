@@ -8,6 +8,7 @@ from evidence.models import Evidence, SourceType
 from evidence.provenance import build_evidence_id, build_provenance
 from evidence.scoring import SEARCH_WINDOW_PADDING, temporal_relevance
 from tools.incidents import get_incident
+from tools.registry import allowlisted_tool
 
 # metric_name -> (comparison, threshold). A deterministic experimental
 # baseline (spec §16), not a calibrated alerting rule — thresholds are
@@ -53,6 +54,7 @@ def _to_evidence(row: MetricPointRecord, *, relevance: float) -> Evidence:
     )
 
 
+@allowlisted_tool("query_metrics")
 async def query_metrics(incident_id: str, metric_name: str | None = None) -> list[Evidence]:
     """spec §12's query_metrics(): every metric point for this incident's
     service in a padded window, optionally filtered to one metric_name."""
@@ -82,6 +84,7 @@ async def query_metrics(incident_id: str, metric_name: str | None = None) -> lis
     ]
 
 
+@allowlisted_tool("detect_anomaly")
 async def detect_anomaly(incident_id: str, metric_name: str) -> list[Evidence]:
     """spec §12's detect_anomaly(): points for `metric_name` that cross a
     fixed, documented threshold (see _ANOMALY_THRESHOLDS)."""
