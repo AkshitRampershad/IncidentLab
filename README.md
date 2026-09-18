@@ -1,8 +1,5 @@
 # IncidentLab
 
-[![CI](https://github.com/AkshitRampershad/incidentlab/actions/workflows/ci.yml/badge.svg)](https://github.com/AkshitRampershad/incidentlab/actions/workflows/ci.yml)
-[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-
 A multi-agent system that investigates software-production incidents —
 and a benchmark harness that measures whether that multi-agent approach
 is actually worth its complexity, rather than assuming it.
@@ -18,37 +15,6 @@ database expires 30 days after creation. If it's unresponsive or you
 want a persistent instance, run it yourself: `docker compose up --build`,
 then open http://localhost:3000 — see [Quick Start](#quick-start) below
 (under one minute if your machine already has Docker).
-
-## Project Status
-
-**All 10 phases of the original build specification are implemented and
-merged to `main`.** That is a statement about scope completion, not
-about every known limitation being resolved — this project has
-consistently disclosed its own gaps rather than hide them:
-
-- No authentication or rate limiting on the API (open by design at this
-  stage — see `docs/deployment.md`).
-- No TLS built in; a reverse proxy is left to the deployer.
-- The evaluation dataset is small (6 incidents across 2 scenarios) and
-  that's stated plainly, not implied to be larger.
-- No live LLM has been exercised end-to-end in this project's own build
-  environment — the fully deterministic path (see "Security Model"
-  below) is what's actually been verified there.
-- **A version tag exists locally but has not been pushed to GitHub, and
-  no GitHub Release has been published.** There is no `v0.1.0` tag and
-  no Release on this repository's GitHub page as of this writing —
-  `git tag`/`git log` locally do not reflect what's publicly visible on
-  GitHub, and this README does not claim otherwise.
-- **Deployed to Render** via the `render.yaml` Blueprint on the free
-  tier — see [Live Demo](#live-demo) above and
-  [Deployment](#deployment) below for the free-tier caveats (spin-down,
-  Postgres expiry).
-
-The full, itemized status — what shipped in each phase, what was
-verified how, and every known limitation — is
-`docs/IMPLEMENTATION_STATUS.md`. `docs/design-decisions.md` records the
-reasoning behind non-obvious choices as they were made, not
-reconstructed after the fact.
 
 ## What is IncidentLab?
 
@@ -260,13 +226,6 @@ yet — see Roadmap).
 Full detail and the specific DDRs behind each of these: `docs/design-decisions.md`
 (DDR-023 through DDR-027).
 
-## Screenshots
-
-Not yet included in this repository. Run it locally (see Quick Start
-below) to see the investigation console — agent activity cards,
-hypothesis confidence bars, and the root-cause-analysis panel — and the
-evaluation dashboard described above.
-
 ## Quick Start
 
 ```bash
@@ -396,18 +355,6 @@ See `docs/deployment.md` for the full guide: required `.env` changes for
 a real deployment, what's deliberately out of scope (TLS/reverse proxy,
 a managed Postgres, Ollama as a service, Alembic — each with its
 reasoning), and backup/log guidance.
-
-## Roadmap
-
-All 10 phases of the original build spec are implemented — that doesn't
-mean nothing's left. Concrete, disclosed gaps, not secretly-missing
-"phases": fixing the GHCR publish workflow so it actually succeeds;
-pushing the `v0.1.0` tag and publishing a GitHub Release (currently
-blocked by this session's git/tool permissions — a one-time manual
-action); a real OTel collector to visualize traces, not just print them;
-and the deployment gaps `docs/deployment.md` lists explicitly
-(TLS/reverse proxy, a managed Postgres, real horizontal scaling,
-Alembic).
 
 ## License
 
