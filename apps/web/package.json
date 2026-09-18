@@ -1,0 +1,28 @@
+{
+  "name": "incidentlab-web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "next": "^15.0.0",
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "@types/node": "^22.0.0",
+    "@types/react": "^18.3.0",
+    "@types/react-dom": "^18.3.0",
+    "eslint": "^9.0.0",
+    "eslint-config-next": "^15.0.0",
+    "@eslint/eslintrc": "^3.1.0"
+  },
+  "overrides": {
+    "postcss": "^8.5.28"
+  }
+}

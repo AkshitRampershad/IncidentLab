@@ -1,0 +1,36 @@
+.PHONY: setup dev test lint format incident investigate evaluate benchmark reset clean
+
+setup: ## Install Python and Node dependencies for local (non-Docker) development.
+	uv sync
+	cd apps/web && npm install
+
+dev: ## Start the full stack via Docker Compose.
+	docker compose up --build
+
+test: ## Run the Python test suite.
+	uv run pytest
+
+lint: ## Lint Python (ruff) and the web app (eslint).
+	uv run ruff check .
+	cd apps/web && npm run lint
+
+format: ## Format Python (ruff format) and check it's applied.
+	uv run ruff format .
+
+reset: ## Stop and remove containers + volumes (drops the local Postgres data).
+	docker compose down -v
+
+clean: reset ## Remove local build/dependency artifacts.
+	rm -rf .venv apps/web/node_modules apps/web/.next .pytest_cache .ruff_cache
+
+incident: ## Phase 2 (Incident Simulator) - not implemented yet.
+	@echo "make incident is implemented in Phase 2 (Incident Simulator)."
+
+investigate: ## Phase 5 (Orchestration) - not implemented yet.
+	@echo "make investigate is implemented in Phase 5 (Orchestration)."
+
+evaluate: ## Phase 6 (Evaluation) - not implemented yet.
+	@echo "make evaluate is implemented in Phase 6 (Evaluation)."
+
+benchmark: ## Phase 6 (Evaluation) - not implemented yet.
+	@echo "make benchmark is implemented in Phase 6 (Evaluation)."
