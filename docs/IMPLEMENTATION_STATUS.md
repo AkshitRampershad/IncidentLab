@@ -1254,3 +1254,129 @@ now with one addition:**
    confirm a run actually succeeds and an image lands on
    `ghcr.io/<owner>/incidentlab-api`/`-web` before re-describing GHCR
    publishing as working in any doc.
+
+---
+
+## Render deployment readiness
+
+Not a new phase — preparing the existing, already-complete codebase for
+deployment to Render specifically, at the user's request (a Render
+account already connected to the GitHub repo). Scope: `render.yaml`, a
+real bug in the frontend's API-URL handling that this work surfaced and
+fixed, `docker-compose.yml`/`.env.example`/both Dockerfiles' small
+env-driven adjustments, and `docs/deployment.md`. No new agents, no
+orchestration/evaluation changes, no product features.
+
+**A real bug found and fixed, not assumed:** `apps/web/lib/api.ts` read
+`process.env.NEXT_PUBLIC_API_URL` at module load — Next.js inlines every
+`NEXT_PUBLIC_*` reference into the browser bundle at `docker build`
+time, so this value had *never* actually been configurable at container
+runtime, in any environment, including this project's own local
+`docker compose up`. It only ever "worked" because the hardcoded
+`"http://localhost:8000"` fallback happened to match Compose's specific
+topology. On Render — where the API's real URL is an assigned hostname —
+this would have silently broken every request the deployed frontend
+makes. Fixed with a same-origin runtime-config route
+(`apps/web/app/api/config/route.ts`, reading a plain, non-prefixed
+`API_URL` server env var, `force-dynamic` so it can't be statically
+baked either) that `apps/web/lib/api.ts` now calls once per page load
+instead of reading a build-time constant. See
+`docs/design-decisions.md` DDR-033 for the full mechanism and how it was
+verified (grepped the built bundle for zero API-URL references; started
+the actual production standalone build with a value that was never
+present at build time and confirmed `/api/config` returned exactly that
+value; ran the full investigation flow through a real headless browser
+against that build).
+
+**Implemented:**
+- `render.yaml` (new) — a Render Blueprint: one free Postgres database
+  (`incidentlab-db`, version 16, matching `docker-compose.yml`) and two
+  `runtime: docker` services (`incidentlab-api`, `incidentlab-web`)
+  pointed at the existing Dockerfiles unchanged in build shape. Postgres
+  connection info flows to `incidentlab-api` as five separate env vars
+  via `fromDatabase`'s per-property references
+  (`host`/`port`/`user`/`password`/`database`), matching
+  `core/config.py`'s existing five-field `Settings` shape exactly — zero
+  backend code changes needed for Render's database wiring.
+  `CORS_ALLOWED_ORIGINS` and `API_URL` are both `sync: false` (Render's
+  documented "prompt for this in the dashboard" mechanism), not guessed
+  at via `fromService`, because it was unclear from Render's own
+  Blueprint spec whether that reference's `host` property returns a bare
+  hostname or a full URL with scheme — see DDR-034.
+- `apps/api/Dockerfile` / `apps/web/Dockerfile` — both `CMD`/`HEALTHCHECK`
+  now read `$PORT` with a fallback to their existing `EXPOSE`d default
+  (8000/3000) — Render (and most PaaS hosts) assign their own port via
+  `$PORT`; auto-detecting an unset port from `EXPOSE` alone is not
+  guaranteed per Render's own docs. `docker-compose.yml` never sets
+  `PORT`, so local dev behavior is unchanged.
+- `docker-compose.yml` / `.env.example` — `NEXT_PUBLIC_API_URL` renamed
+  to `API_URL` throughout, matching the actual runtime mechanism above.
+- `docs/deployment.md` — a full "Deploying to Render (Blueprint)"
+  section: exact dashboard steps, which two values must be entered
+  manually and why, and Render's real cost caveats stated up front (free
+  Postgres expires 30 days after creation with a 14-day grace period, no
+  backups on the free plan, free web services spin down after 15 minutes
+  idle with ~1 minute cold starts) — not silently assumed to stay $0
+  forever just because every `plan:` in `render.yaml` says `free`.
+- `docs/design-decisions.md` — DDR-033 (the API-URL runtime-resolution
+  fix) and DDR-034 (`render.yaml`'s specific choices, checked against
+  Render's actual published Blueprint spec before being written, since
+  `render.com` itself is unreachable from this sandbox — fetched via
+  `render-oss`'s and `openai`'s own curated Blueprint field references
+  instead of guessed from general PaaS familiarity).
+
+**Files changed:** `render.yaml` (new),
+`apps/web/app/api/config/route.ts` (new), `apps/web/lib/api.ts`,
+`apps/api/Dockerfile`, `apps/web/Dockerfile`, `docker-compose.yml`,
+`.env.example`, `docs/deployment.md`, `docs/design-decisions.md`.
+
+**Tests / verification:**
+- `uv run pytest -q` — 189 passed (no backend logic changed; re-run to
+  confirm the Dockerfile/compose edits didn't regress anything Python
+  side).
+- `uv run ruff check .` / `ruff format --check .` — clean.
+- `uv sync` — resolves cleanly.
+- `docker compose config --quiet` — valid after the `API_URL`
+  rename and both Dockerfile changes; full `docker compose config`
+  output inspected to confirm `API_URL` and the Postgres env vars
+  resolve as expected.
+- `render.yaml` parsed with `yaml.safe_load` — valid YAML, structure
+  matches Render's documented field names exactly (checked, not
+  assumed).
+- `npm run build` / `npm run lint` (`apps/web`) — clean.
+- **The actual fix, verified for real, not just by reading the diff:**
+  built the production standalone bundle with no `API_URL` set (matching
+  the Docker builder stage's exact conditions), grepped
+  `.next/static/chunks/` for `localhost:8000` — zero matches (confirms
+  nothing API-URL-shaped is baked into the browser bundle anymore).
+  Started that same build with
+  `API_URL="http://distinctive-runtime-proof:9999"` — a value that could
+  not possibly have been present at build time — and `/api/config`
+  correctly returned it. Then started it again with the real local
+  API's address, created a real incident, and drove a full
+  generate → investigate flow through a real headless browser
+  (Playwright) against that production build; all five agent cards, the
+  hypothesis list, and the RCA panel rendered correctly.
+
+**Known limitations / what's still unverified:**
+- **Render has never actually deployed this Blueprint.** `render.com` is
+  unreachable from this sandbox's egress policy (confirmed, same class
+  of restriction as Docker Hub and GHCR in earlier phases) — no service
+  was created, no database was provisioned, no cost was incurred, and no
+  public URL exists. `render.yaml`'s correctness rests on matching
+  Render's documented schema, not on a deploy that completed. The user
+  applying the Blueprint themselves (as prompted) is the actual
+  end-to-end check.
+- The two `sync: false` values (`CORS_ALLOWED_ORIGINS`, `API_URL`) must
+  be entered manually after both services exist — `docs/deployment.md`
+  says exactly what to enter and why, but this is a real manual step,
+  not an oversight to fix later.
+- `render.yaml`'s free Postgres plan expires 30 days after creation;
+  nothing in this repo can extend that — it's a Render account-level
+  decision (upgrade to a paid plan, or accept the database will need
+  recreating).
+- Port auto-detection risk is mitigated (`$PORT` is now read explicitly)
+  but not eliminated as a class of deploy-time surprise — if Render's
+  build/runtime environment differs from what's assumed here in some
+  other way, the first real deploy is where that would surface, not
+  before.

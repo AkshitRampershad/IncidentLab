@@ -47,7 +47,10 @@ services:
       dockerfile: apps/web/Dockerfile
     restart: unless-stopped
     environment:
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000}
+      # Read live, per-request, by apps/web/app/api/config/route.ts — NOT
+      # baked into the browser bundle at build time the way a
+      # NEXT_PUBLIC_-prefixed var would be. See docs/design-decisions.md.
+      API_URL: ${API_URL:-http://localhost:8000}
     ports:
       - "${WEB_PORT:-3000}:3000"
     depends_on:

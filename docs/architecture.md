@@ -523,12 +523,26 @@ flowchart LR
   not yet fixed as of this writing. See `docs/deployment.md` for current
   status.
 - **`docs/deployment.md`** — a real deployment guide: pre-built-image vs.
-  build-on-host options, the `.env` values that *must* change for a real
-  deployment (`POSTGRES_PASSWORD`, `CORS_ALLOWED_ORIGINS`,
-  `NEXT_PUBLIC_API_URL`, `ENVIRONMENT`), what's deliberately out of scope
-  (TLS/reverse proxy, a managed Postgres, Ollama as a service, real
-  horizontal scaling, Alembic — DDR-031), and backup/log guidance for the
-  single-host Compose deployment this phase actually covers.
+  build-on-host options, a Render Blueprint walkthrough (`render.yaml` —
+  see below), the `.env` values that *must* change for a real deployment
+  (`POSTGRES_PASSWORD`, `CORS_ALLOWED_ORIGINS`, `API_URL`, `ENVIRONMENT`),
+  what's deliberately out of scope (TLS/reverse proxy, a managed
+  Postgres, Ollama as a service, real horizontal scaling, Alembic —
+  DDR-031), and backup/log guidance for the single-host Compose
+  deployment this phase actually covers.
+- **Update (Render deployment prep):** `render.yaml` (repo root) is a
+  Render Blueprint reusing both existing Dockerfiles unchanged, mapping
+  Postgres connection info onto `core/config.py`'s existing five-field
+  `Settings` shape via `fromDatabase` per-property references — no
+  backend code changes. This work also found and fixed a real bug:
+  `apps/web/lib/api.ts` read `NEXT_PUBLIC_API_URL` at module load, which
+  Next.js inlines into the browser bundle at `docker build` time — never
+  actually configurable at container runtime, in any environment,
+  including this project's own local dev (it only ever "worked" because
+  the hardcoded fallback happened to match Compose's specific topology).
+  Fixed with a same-origin runtime-config route
+  (`apps/web/app/api/config/route.ts`) reading a plain `API_URL` server
+  var instead. See `docs/design-decisions.md` DDR-033 and DDR-034.
 
 Same disclosure as every prior phase: this sandbox cannot pull images
 from Docker Hub — confirmed two distinct ways while working on this

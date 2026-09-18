@@ -1,9 +1,11 @@
 # Deployment
 
 This describes deploying IncidentLab to a real host — not local dev
-(`docker compose up --build` from the README already covers that). It's
-one option (a single VM/box running Docker Compose), not the only one;
-nothing here needs a specific cloud provider.
+(`docker compose up --build` from the README already covers that).
+Single-host Docker Compose (Options A/B below) and Render (a Blueprint,
+`render.yaml` in the repo root) are both covered; neither is the only
+possible option, and nothing here needs a specific cloud provider beyond
+what each section is actually about.
 
 **Disclosure, same as every other phase of this project:** the sandbox
 this was built in cannot pull images from Docker Hub (confirmed two ways
@@ -46,6 +48,80 @@ Once it works: replace the `build:` block for `api` and `web` in
 `docker-compose.yml` with `image:`, pointing at the published tags, then
 `docker compose up -d`.
 
+## Deploying to Render (Blueprint)
+
+`render.yaml` in the repo root is a
+[Render Blueprint](https://render.com/docs/infrastructure-as-code) —
+Render reads it and creates a Postgres database plus the `api`/`web`
+services from the existing Dockerfiles, no manual service configuration
+needed for the parts it *can* express. Two values it genuinely can't
+(each service's URL doesn't exist until Render creates it) are called
+out explicitly below.
+
+**Cost, stated plainly up front:** every plan in `render.yaml` is
+`free`. That is real for both web services indefinitely, and real for
+the database **for 30 days from creation** — Render's free Postgres plan
+expires after 30 days (a 14-day grace period to upgrade before Render
+deletes it), which is Render's platform limitation, not something this
+file or this project can configure around. Free web services also spin
+down after 15 minutes with no traffic and take about a minute to wake up
+on the next request — expect that cold-start delay, especially for the
+first request after a while, and expect it potentially twice in a row
+(web spins up, then calls an also-asleep api).
+
+1. **Deploy the Blueprint.** In the Render dashboard: **New** →
+   **Blueprint** → select the `incidentlab` GitHub repo (already
+   connected) → Render parses `render.yaml` and shows the three
+   resources it will create (`incidentlab-db`, `incidentlab-api`,
+   `incidentlab-web`) → **Apply**. Render creates the database first,
+   then builds and deploys both Docker services from their existing
+   Dockerfiles.
+2. **Wait for the first deploy to finish**, then note both services'
+   real URLs from the Render dashboard (each service's page shows it
+   near the top, shaped like `https://incidentlab-api-xxxx.onrender.com`
+   — Render may append a short suffix if the exact name is taken; use
+   whatever Render actually assigned, not the plain
+   `incidentlab-api.onrender.com` guess).
+3. **Set the two manual environment variables** this file cannot compute
+   (see DDR-034 for why `render.yaml` doesn't attempt this via
+   `fromService`):
+   - On **`incidentlab-api`** → Environment → `CORS_ALLOWED_ORIGINS` →
+     the **web** service's real URL from step 2 (e.g.
+     `https://incidentlab-web-xxxx.onrender.com`, no trailing slash).
+   - On **`incidentlab-web`** → Environment → `API_URL` → the **api**
+     service's real URL from step 2 (e.g.
+     `https://incidentlab-api-xxxx.onrender.com`).
+   - Save each — Render redeploys that service automatically. `api`'s
+     redeploy just picks up the new CORS value; `web`'s doesn't even
+     need a rebuild for this to take effect, since `API_URL` is read
+     live per-request (DDR-033), not baked into the image — but Render
+     restarts the container on an env var change regardless, which is
+     enough.
+4. **Verify.** Open the web service's URL, generate an incident, run an
+   investigation. If it hangs on "Investigating…" with a CORS error in
+   the browser console, `CORS_ALLOWED_ORIGINS` doesn't exactly match the
+   web URL (scheme and no trailing slash both matter). If the page loads
+   but every action 404s or times out, re-check `API_URL` on the web
+   service.
+
+No LLM is configured in `render.yaml` — the deployment runs in the fully
+deterministic fallback path every agent already has (DDR-010), same as
+this project's own build/test environment. Pointing `LLM_PROVIDER` at
+`openai`/`anthropic` with a real `LLM_API_KEY` (added manually in the
+dashboard, never in `render.yaml` — see "Do NOT commit secrets" in this
+doc's own scope) works the same way here as anywhere else in this
+project.
+
+**What's been verified about this path, and what hasn't:** every field
+in `render.yaml` was checked against Render's actual published Blueprint
+schema before being written (see DDR-034) — `docker compose config` was
+also re-run after this section's changes and still validates. Render
+itself has never actually built or deployed this Blueprint — `render.com`
+is unreachable from the sandbox this was written in, so no service was
+created, no cost was incurred, and no public URL exists as a result of
+writing this file. The steps above are correct by matching Render's
+documented behavior, not by having been clicked through.
+
 ## Required changes for a real deployment
 
 `.env.example`'s defaults are for `localhost` dev and are **not safe or
@@ -55,7 +131,7 @@ functional** as-is anywhere else:
 |---|---|---|
 | `POSTGRES_PASSWORD` | `incidentlab` | a real generated secret |
 | `CORS_ALLOWED_ORIGINS` | `http://localhost:3000` | the actual origin the web app is served from (e.g. `https://incidentlab.example.com`) — the API rejects browser requests from any origin not listed here (see `docs/design-decisions.md` DDR-028) |
-| `NEXT_PUBLIC_API_URL` | `http://localhost:8000` | the API's actual public URL — this is baked into the web app at container **start** time via `docker compose`'s environment substitution, but Next.js's standalone server reads `NEXT_PUBLIC_*` vars at runtime here since nothing pre-renders API calls at build time (every fetch is client-side) |
+| `API_URL` | `http://localhost:8000` | the API's actual public URL — read live, per request, by `apps/web/app/api/config/route.ts` (DDR-033); this is *not* the same mechanism as a `NEXT_PUBLIC_`-prefixed var, which Next.js bakes into the browser bundle at `docker build` time and can't be changed by an env var set later, at container start |
 | `ENVIRONMENT` | `development` | `production` |
 
 Everything else (`LLM_*`, `CONFIDENCE_*`, `TOOL_TIMEOUT_SECONDS` and its
@@ -111,6 +187,12 @@ backup schedule here — this is a lab/demo system with regeneratable data
 is irreplaceable user data), so a cron/managed-backup story is scoped out
 for the same reason a managed Postgres is: add it when there's an actual
 deployment that needs it, not speculatively.
+
+On Render specifically: free-plan Postgres databases don't support any
+form of backup at all (Render's own limitation, not configurable), on
+top of the 30-day expiry mentioned above — another reason this project's
+"regeneratable data" framing matters for that path in particular, not
+just as a general disclaimer.
 
 ## Logs
 

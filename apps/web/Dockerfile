@@ -28,8 +28,11 @@ EXPOSE 3000
 # whether the API is reachable (client components fetch after hydration),
 # so a 200 there is a real "this process is alive and serving" signal.
 # node:22-slim has no curl/wget, so this uses Node's own http client
-# rather than adding a package just for the healthcheck.
+# rather than adding a package just for the healthcheck. Reads $PORT
+# (falls back to 3000, this image's EXPOSEd default) — the standalone
+# server.js Next.js generates already binds to $PORT natively when set,
+# so no CMD change is needed for that half, only this healthcheck's.
 HEALTHCHECK --interval=10s --timeout=5s --retries=5 \
-    CMD node -e "require('http').get('http://localhost:3000/', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"
+    CMD node -e "require('http').get('http://localhost:' + (process.env.PORT || 3000) + '/', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"
 
 CMD ["node", "server.js"]

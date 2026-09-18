@@ -923,3 +923,129 @@ access recreates the tag exactly (the commit it points at, `4652168`,
 is already on `origin/main`); GitHub's own "Draft a new release" UI can
 create the tag and the Release object together in one step, which also
 covers the second gap above.
+
+## DDR-033: the frontend's API base URL is resolved at container runtime via a same-origin route, not read from a `NEXT_PUBLIC_`-prefixed build-time variable
+
+**Context:** preparing an actual Render deployment (`render.yaml`)
+surfaced a real, previously-unnoticed bug in `apps/web/lib/api.ts`:
+`const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"`.
+Next.js inlines every `NEXT_PUBLIC_*` reference into the browser's
+JavaScript bundle at `next build` time — not read live from the
+container's environment at request time, regardless of what
+`docker-compose.yml`'s `environment:` block or a PaaS dashboard sets
+later. `apps/web/Dockerfile`'s `RUN npm run build` runs in the builder
+stage with no `NEXT_PUBLIC_API_URL` set at all (it was only ever set in
+the final `runner` stage, after the bundle was already compiled), so
+this line had *always* silently ignored whatever value was configured —
+every deployment, this sandbox's local dev included, was only working
+because the hardcoded `"http://localhost:8000"` fallback happened to be
+the correct value for `docker compose`'s specific topology. On Render,
+where the API's real URL is an assigned hostname nothing resembling
+`localhost`, this would have silently broken every request the deployed
+frontend makes, with no error message pointing at the actual cause (a
+production JS bundle permanently pointed at `localhost:8000`, which
+doesn't exist in that browser's network).
+
+**Decision:** `apps/web/app/api/config/route.ts` (new) reads a plain,
+non-prefixed `API_URL` server environment variable and returns it as
+JSON, marked `export const dynamic = "force-dynamic"` so it can never be
+statically evaluated once at build time either. `apps/web/lib/api.ts`'s
+`request()` now calls a `resolveApiUrl()` helper that fetches this
+same-origin route once per page load (cached after that) instead of
+reading a module-level constant. `docker-compose.yml`, `.env.example`,
+and `render.yaml` were all updated to set `API_URL` (not
+`NEXT_PUBLIC_API_URL`) — the latter is kept only as a secondary fallback
+inside the route handler for anyone with it already set, though as a
+`NEXT_PUBLIC_*` var it's subject to the exact same build-time-inlining
+behavior that motivated this fix, so it isn't the real mechanism either.
+
+**Why:** a route handler is server-only code — never bundled into the
+browser — so Next.js never inlines a *non-prefixed* variable read there;
+it's read fresh via Node's live `process.env` on every request, exactly
+like any other server-side env var in this project. This was verified,
+not assumed: the built production bundle was grepped and confirmed to
+contain zero references to any API URL (`grep -rl "localhost:8000"
+.next/static/`, zero matches — it only appears in the server-only route
+file); then the standalone server was started with a value that was
+never present during `npm run build`
+(`API_URL="http://distinctive-runtime-proof:9999"`) and `/api/config`
+correctly returned exactly that value, proving the resolution is live,
+not baked in. A full Playwright pass against that same production build,
+pointed at a real local API, confirmed the whole investigation flow
+still works unchanged — every `api.*` method already returned a
+`Promise`, so adding one more internal `await` before the network call
+is fully transparent to all five existing call sites; none needed
+edits. The alternative — passing `NEXT_PUBLIC_API_URL` as a Docker build
+`ARG` — doesn't work for a PaaS like Render at all: the target's URL
+isn't known until *after* the service exists, and Render's Blueprint
+spec documents no mechanism for injecting a custom build-time argument
+into a Dockerfile build in the first place (confirmed against Render's
+own Blueprint YAML reference and a curated field-by-field summary of it
+before writing `render.yaml`, not assumed from memory) — so the value
+would need to be hardcoded per image build, defeating "environment-driven
+configuration" entirely. This fix doesn't touch CORS, evidence,
+agents, orchestration, or any product behavior — it's a deployment
+correctness fix, not a redesign.
+
+## DDR-034: `render.yaml` reuses the existing Dockerfiles unchanged in shape, maps Postgres connection info field-by-field, and leaves two cross-service URLs for manual entry
+
+**Context:** the user connected a Render account to the repo and asked
+for a $0 Render deployment using the existing architecture — no
+redesign. `core/config.py`'s `Settings` reads five separate Postgres
+fields (`postgres_host`/`_port`/`_user`/`_password`/`_db`), not one
+`DATABASE_URL`; `apps/api`'s CORS and `apps/web`'s API base URL both
+need to know the *other* service's real address, which doesn't exist
+until Render creates it.
+
+**Decision:** `render.yaml` defines one `databases` entry
+(`incidentlab-db`, `plan: free`, `postgresMajorVersion: "16"` — matching
+`docker-compose.yml`'s `postgres:16-alpine`) and two `runtime: docker`
+services pointed at the exact existing `dockerfilePath`/`dockerContext`
+values `docker-compose.yml` already uses (`./apps/api/Dockerfile` and
+`./apps/web/Dockerfile`, both with build context `.`) — no Dockerfile
+restructuring for Render specifically. The five Postgres env vars on
+`incidentlab-api` are each set via `fromDatabase` with a *separate*
+`property` (`host`/`port`/`user`/`password`/`database`) rather than one
+`DATABASE_URL` with `property: connectionString` — this is what lets
+`core/config.py` and `core/db.py` need zero changes; a single
+connection-string approach would have required parsing logic that
+doesn't exist today. `healthCheckPath` is set to the API's existing
+`/health` (already a dependency-free liveness check, needed no changes)
+and the web service's existing `/` (already what its own Docker
+`HEALTHCHECK` — DDR-029 — checks). `CORS_ALLOWED_ORIGINS` (on
+`incidentlab-api`) and `API_URL` (on `incidentlab-web`, DDR-033) are
+both `sync: false` — Render's documented mechanism for "prompt for this
+value in the dashboard, don't try to compute it from this file" —
+rather than guessed at with a `fromService` reference, since this
+project's research into Render's actual Blueprint spec left it unclear
+whether that reference's `host` property returns a bare hostname or a
+full `https://` URL, and inventing the wrong shape here would silently
+break CORS/API connectivity in a way that's annoying to debug. Neither
+Dockerfile's `CMD` was hardcoded to a specific port already reachable
+from outside; both now read `$PORT` (falling back to their existing
+`EXPOSE`d default, 8000/3000, when unset — i.e. unchanged behavior for
+`docker compose`, which never sets `PORT`) since Render assigns its own
+port to bind to and, per Render's own documentation, auto-detecting an
+`EXPOSE`d port when `PORT` is absent is not guaranteed ("usually able to
+detect").
+
+**Why:** every field above was checked against Render's actual
+published Blueprint spec (fetched via `render-oss`'s and `openai`'s own
+curated Blueprint field references, since `render.com` itself is
+unreachable from this sandbox's egress policy) rather than guessed from
+general PaaS familiarity — `fromDatabase`'s per-property option list,
+`sync: false`'s documented semantics ("prompts in the Dashboard... only
+on initial Blueprint setup"), the free plan's exact value (`plan:
+free`), and `postgresMajorVersion: "16"`'s support were each confirmed
+this way before being written into `render.yaml`, consistent with this
+project's standing rule to never invent unverified infrastructure
+syntax. What this deployment path costs, disclosed plainly rather than
+left for the user to discover: Render's free Postgres plan **expires 30
+days after creation** (a 14-day grace period to upgrade before deletion,
+per Render's own docs) — "$0" here is time-bounded, not a permanent free
+tier, and free web services spin down after 15 minutes of inactivity
+(~1 minute cold start on the next request, and with two independent
+free services, a cold visitor can hit both delays back to back). Neither
+is something `render.yaml` can change; both are Render account-level
+Render platform behavior, stated in `docs/deployment.md` rather than
+implied away by "this should be $0."

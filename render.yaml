@@ -1,0 +1,93 @@
+# Render Blueprint for IncidentLab — maps the existing docker-compose.yml
+# topology (postgres, api, web) onto Render's managed services using the
+# existing Dockerfiles unchanged in build shape (same build context, same
+# Dockerfile paths apps/api/Dockerfile and apps/web/Dockerfile already
+# use). No application code or architecture changes here — this file is
+# glue, not a rewrite.
+#
+# Two env vars below (CORS_ALLOWED_ORIGINS, API_URL) are deliberately
+# `sync: false`: each service's public URL only exists once Render
+# creates it, so this file cannot reference "the other service's URL" at
+# blueprint-apply time — see docs/deployment.md's "Deploying to Render"
+# section for the exact values to enter and when.
+#
+# $0 as configured: both services use `plan: free`, and the database uses
+# Render's free Postgres plan. Read docs/deployment.md's Render section
+# before assuming this stays $0 indefinitely — free Postgres on Render
+# expires 30 days after creation unless upgraded to a paid plan, and free
+# web services spin down after 15 minutes of inactivity (~1 minute cold
+# start on the next request). Neither is something this file can change;
+# both are disclosed, not hidden.
+
+databases:
+  - name: incidentlab-db
+    databaseName: incidentlab
+    user: incidentlab
+    plan: free
+    region: oregon
+    postgresMajorVersion: "16"
+
+services:
+  - type: web
+    name: incidentlab-api
+    runtime: docker
+    dockerfilePath: ./apps/api/Dockerfile
+    dockerContext: .
+    plan: free
+    region: oregon
+    healthCheckPath: /health
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: LOG_LEVEL
+        value: INFO
+      # core/config.py's Settings already reads these five as separate
+      # fields (not one DATABASE_URL) — fromDatabase's per-property
+      # references map onto that shape exactly, so core/db.py and
+      # core/config.py need no changes at all for Render.
+      - key: POSTGRES_HOST
+        fromDatabase:
+          name: incidentlab-db
+          property: host
+      - key: POSTGRES_PORT
+        fromDatabase:
+          name: incidentlab-db
+          property: port
+      - key: POSTGRES_USER
+        fromDatabase:
+          name: incidentlab-db
+          property: user
+      - key: POSTGRES_PASSWORD
+        fromDatabase:
+          name: incidentlab-db
+          property: password
+      - key: POSTGRES_DB
+        fromDatabase:
+          name: incidentlab-db
+          property: database
+      # MUST be set manually, after incidentlab-web exists and its real
+      # URL is known (see docs/deployment.md) — e.g.
+      # https://incidentlab-web.onrender.com. Until set, the API rejects
+      # every browser request from the deployed frontend (this is
+      # DDR-028's CORS behavior working as designed, not a bug).
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+
+  - type: web
+    name: incidentlab-web
+    runtime: docker
+    dockerfilePath: ./apps/web/Dockerfile
+    dockerContext: .
+    plan: free
+    region: oregon
+    healthCheckPath: /
+    envVars:
+      # MUST be set manually, after incidentlab-api exists and its real
+      # URL is known (see docs/deployment.md) — e.g.
+      # https://incidentlab-api.onrender.com. Read live, per request, by
+      # apps/web/app/api/config/route.ts — deliberately NOT a
+      # NEXT_PUBLIC_-prefixed var, since those get inlined into the
+      # browser bundle at `docker build` time, before this value or even
+      # incidentlab-api itself exist yet. See docs/design-decisions.md.
+      - key: API_URL
+        sync: false

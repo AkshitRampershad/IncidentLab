@@ -360,6 +360,14 @@ path. Beyond that:
   the [Actions tab](https://github.com/AkshitRampershad/incidentlab/actions/workflows/docker-publish.yml)
   directly. Until a run succeeds, building from source is the only
   verified deployment path.
+- **A Render Blueprint** (`render.yaml`) is ready for a $0-to-start
+  deployment (free web services + free Postgres) using the existing
+  Dockerfiles unchanged — see `docs/deployment.md`'s "Deploying to
+  Render" section for exact steps, the two values that must be entered
+  manually in Render's dashboard, and Render's own cost caveats (free
+  Postgres expires 30 days after creation; free services cold-start).
+  **This Blueprint has not been deployed** — no public URL exists as a
+  result of writing it.
 
 See `docs/deployment.md` for the full guide: required `.env` changes for
 a real deployment, what's deliberately out of scope (TLS/reverse proxy,
