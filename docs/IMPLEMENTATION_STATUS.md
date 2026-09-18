@@ -1,6 +1,6 @@
 # Implementation Status
 
-- [ ] Phase 1 — Repository + Infrastructure (implemented; `docker compose up` blocked from verification in the dev sandbox — see below)
+- [x] Phase 1 — Repository + Infrastructure
 - [ ] Phase 2 — Incident Simulator
 - [ ] Phase 3 — Evidence Layer
 - [ ] Phase 4 — Agents
@@ -62,18 +62,23 @@ docker compose config         # validates; env-var interpolation resolves
                                # correctly for all three services
 ```
 
-**Could NOT verify in this sandbox:** `docker compose up --build`. The
-sandbox's network egress policy blocks `production.cloudfront.docker.com`
-(Docker Hub's image-layer CDN) with a `403` at the proxy level — confirmed
-via the proxy's own status endpoint (`connect_rejected`, "policy denial").
-This is an environment restriction, not a code issue: `docker compose
-config` validates cleanly, both Dockerfiles were reviewed line-by-line, and
-every service that *can* run outside Docker (the API's test suite, the web
-app's build) was actually executed and passed. **Action needed from you:**
-run `cp .env.example .env && docker compose up --build` in an environment
-with normal Docker Hub access and confirm postgres/api/web all report
-healthy and `http://localhost:3000` shows "API status: ok" — that's the
-one piece of the Phase 1 definition of done I couldn't self-certify.
+**`docker compose up --build` — verified by the repo owner (not in this
+sandbox, which blocks Docker Hub's image CDN by network policy):**
+```
+✔ Image postgres:16-alpine         Pulled
+✔ Image incidentlab-web            Built
+✔ Image incidentlab-api            Built
+Container incidentlab-postgres-1   Healthy
+api-1  | INFO: Application startup complete.
+api-1  | INFO: Uvicorn running on http://0.0.0.0:8000
+api-1  | INFO: 127.0.0.1:... - "GET /health HTTP/1.1" 200 OK   (x4, from the
+                                                                  compose healthcheck)
+web-1  | ▲ Next.js 15.5.25
+web-1  | ✓ Ready in 440ms
+```
+All three services built, started, and reported healthy with no restart
+loops or crash traces; teardown (`Gracefully Stopping...`) was the owner
+hitting Ctrl+C, not a failure. Phase 1's definition of done is met.
 
 **Fixed along the way:** `npm install` initially reported 2 vulnerabilities
 (1 high) in `postcss`, pulled in transitively by `next@15`'s CSS tooling —
@@ -90,8 +95,4 @@ breaking change for Phase 1); `npm audit` now reports 0 vulnerabilities.
 - CI doesn't yet run `docker compose up` end-to-end (no GHA job for it) —
   consider adding a compose-based CI smoke test in a later phase if it
   earns its cost.
-- See "Could NOT verify" above: Docker Compose startup needs your
-  confirmation before Phase 1 is truly done.
-
-**Next phase:** Phase 2 — Incident Simulator, once you've confirmed
-`docker compose up` above.
+**Next phase:** Phase 2 — Incident Simulator.
