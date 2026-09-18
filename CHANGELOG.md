@@ -48,11 +48,11 @@ choice.
   depends on an LLM response; OpenTelemetry tracing.
 - **Deployment:** hardened, non-root container images with built-in
   health checks; configurable CORS; a deployment guide
-  (`docs/deployment.md`). A GHCR image-publishing workflow
-  (`.github/workflows/docker-publish.yml`) was added but has not yet
-  succeeded on any run — see "Known limitations" below and
-  `docs/deployment.md` for current status; building from source remains
-  the only verified path today.
+  (`docs/deployment.md`); pre-built images published to GHCR on every
+  green `main` (`.github/workflows/docker-publish.yml` — its first three
+  runs failed on a buildx configuration issue, since fixed and verified
+  working); a Render Blueprint (`render.yaml`) ready to deploy but not
+  yet deployed.
 - **Open source readiness:** `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`,
   `SECURITY.md`, issue/PR templates.
 
@@ -66,8 +66,9 @@ choice.
   disclosed dataset — not spec-scale (50-100+ incidents).
 - No live LLM has been exercised end-to-end in this project's own build
   environment; the deterministic path is what's been verified there.
-- The GHCR image-publishing workflow has not yet succeeded on any run —
-  no pre-built images are available yet (see `docs/deployment.md`).
+- The `render.yaml` Render Blueprint has never actually been deployed —
+  no Render service exists and no cost has been incurred as a result of
+  it being in this repo (see `docs/deployment.md`).
 
 **Note on the links below:** as of this writing, the `v0.1.0` git tag
 exists in the codebase's history locally but has not been pushed to

@@ -508,20 +508,19 @@ flowchart LR
 - **`.dockerignore`** (existed since Phase 1, extended this phase) —
   keeps `.git`, `__pycache__`, `node_modules`, `.env`, and friends out of
   the build context both Dockerfiles share (`context: .`).
-- **`.github/workflows/docker-publish.yml`** — intended to build and
-  push both images to GHCR, gated on `ci.yml` succeeding on `main`
-  (DDR-030), so a red `main` never gets published as a good build.
-  **Update:** now that it has actually run on GitHub's real runners
-  (unlike this sandbox, which has no GitHub Actions runner), every run
-  so far has failed — `Cache export is not supported for the docker
-  driver` at the `docker/build-push-action` step, because the runner's
-  default buildx driver doesn't support `cache-to: type=gha` without an
-  explicit `docker/setup-buildx-action` step first, which this workflow
-  doesn't have. No image has ever been successfully pushed. This was
-  "correct by construction against well-established patterns" when
-  written and is not — the missing setup step is a real, fixable gap,
-  not yet fixed as of this writing. See `docs/deployment.md` for current
-  status.
+- **`.github/workflows/docker-publish.yml`** — builds and pushes both
+  images to GHCR, gated on `ci.yml` succeeding on `main` (DDR-030), so a
+  red `main` never gets published as a good build. **Update:** its first
+  three runs on GitHub's real runners (unlike this sandbox, which has no
+  GitHub Actions runner) all failed with `Cache export is not supported
+  for the docker driver` — the runner's default buildx driver doesn't
+  support `cache-to: type=gha` without an explicit
+  `docker/setup-buildx-action` step, which the workflow didn't have. The
+  missing step was added (outside this sandbox, by the repo owner
+  directly), and the workflow has since run successfully — both `api`
+  and `web` jobs green, confirmed against GitHub's Actions run history,
+  not assumed. See `docs/deployment.md` for current status of the latest
+  run.
 - **`docs/deployment.md`** — a real deployment guide: pre-built-image vs.
   build-on-host options, a Render Blueprint walkthrough (`render.yaml` —
   see below), the `.env` values that *must* change for a real deployment

@@ -31,7 +31,7 @@ body:
       options:
         - docker compose up --build (Quick Start)
         - Local (non-Docker) dev — make setup / make dev
-        - Pre-built GHCR images (note — not yet published; see docs/deployment.md)
+        - Pre-built GHCR images
         - Something else (describe below)
     validations:
       required: true

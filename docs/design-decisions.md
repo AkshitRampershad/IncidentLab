@@ -828,6 +828,19 @@ error retrieved via `mcp__github__get_job_logs`. Fixing the workflow
 part of the review that found this, which was scoped to documentation
 accuracy, not code changes.
 
+**Update (Render deployment prep):** the missing `docker/setup-buildx-action@v3`
+step was added (by the repo owner, directly on GitHub) and the workflow
+has since run successfully — both `api` and `web` jobs green, confirmed
+against GitHub's Actions run history via the same tool used to find the
+original failure, not assumed from the fix landing. GHCR publishing is
+real again as of this update; `README.md`, `docs/deployment.md`,
+`docs/architecture.md`, and `CHANGELOG.md` were corrected back to
+reflect that. The lesson from this DDR's own history stands either way:
+every claim here was checked against GitHub's actual run history at the
+time it was written, in both directions — when it was broken, and again
+once it was fixed — rather than assumed from the workflow file's
+intent.
+
 ## DDR-031: Alembic migrations remain deferred, reaffirmed specifically for this deployment phase
 
 **Context:** DDR-004 (Phase 1) deferred Alembic because there was no

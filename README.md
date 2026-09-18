@@ -35,11 +35,10 @@ consistently disclosed its own gaps rather than hide them:
   no Release on this repository's GitHub page as of this writing —
   `git tag`/`git log` locally do not reflect what's publicly visible on
   GitHub, and this README does not claim otherwise.
-- **The GHCR image-publishing workflow (`.github/workflows/docker-publish.yml`)
-  exists but has not yet succeeded on any run** — see
-  [Deployment](#deployment) below for the specific, current failure
-  reason. No pre-built container images are available yet; building from
-  source (the Quick Start below) is the only verified path today.
+- **A Render Blueprint (`render.yaml`) is ready but has not been
+  deployed.** No Render service has been created and no public URL
+  exists as a result of it being in this repo — see
+  [Deployment](#deployment) below.
 
 The full, itemized status — what shipped in each phase, what was
 verified how, and every known limitation — is
@@ -351,15 +350,12 @@ path. Beyond that:
 - **CORS is configurable** (`CORS_ALLOWED_ORIGINS` in `.env`) rather than
   hardcoded to `localhost` — required for any deployment on a real
   domain.
-- **Pre-built GHCR images are not currently available.** A publishing
-  workflow (`.github/workflows/docker-publish.yml`) exists and is
-  intended to build and push both images to GHCR on every green `main`,
-  but every run so far has failed during the build step (a buildx
-  cache-driver configuration issue, not a code problem) — see
-  `docs/deployment.md` for the exact error and current status, or check
-  the [Actions tab](https://github.com/AkshitRampershad/incidentlab/actions/workflows/docker-publish.yml)
-  directly. Until a run succeeds, building from source is the only
-  verified deployment path.
+- **Pre-built images are published to GHCR** on every green `main`
+  (`.github/workflows/docker-publish.yml`) — its first three runs failed
+  on a buildx configuration issue, since fixed; check the
+  [Actions tab](https://github.com/AkshitRampershad/incidentlab/actions/workflows/docker-publish.yml)
+  for the latest run's status before relying on a specific image tag
+  being current.
 - **A Render Blueprint** (`render.yaml`) is ready for a $0-to-start
   deployment (free web services + free Postgres) using the existing
   Dockerfiles unchanged — see `docs/deployment.md`'s "Deploying to

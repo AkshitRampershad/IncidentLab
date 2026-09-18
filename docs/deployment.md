@@ -20,29 +20,29 @@ correct by inspection and existing convention, not by a build that
 finished. The repo owner running `docker compose up --build` themselves
 (as in Phase 1) remains the real end-to-end check.
 
-## Option A: build on the host (recommended today)
+## Option A: build on the host
 
 Run `docker compose up -d --build` directly on the target host —
 identical to local dev, just on a real machine with `.env` set for that
 machine's real values instead of `.env.example`'s dev defaults.
 
-## Option B: pre-built images from GHCR — not currently available
+## Option B: pre-built images from GHCR
 
-`.github/workflows/docker-publish.yml` exists and is wired to build and
-push both images to GHCR (`ghcr.io/<owner>/incidentlab-api` and
-`-web`, tagged `latest` and by commit SHA) on every push to `main` that
-passes CI. **As of this writing it has not succeeded on any of its runs**
-— every run so far has failed at the build step with `Cache export is
-not supported for the docker driver` (the workflow's `cache-to:
-type=gha` needs the `docker-container` buildx driver, which the runner
-doesn't have by default without an explicit `docker/setup-buildx-action`
-step; this hasn't been added yet). No image has ever been successfully
-pushed, so there is nothing at `ghcr.io/<owner>/incidentlab-*` to pull
-today. Check the
+`.github/workflows/docker-publish.yml` builds and pushes both images to
+GHCR (`ghcr.io/<owner>/incidentlab-api` and `-web`, tagged `latest` and
+by commit SHA) on every push to `main` that passes CI. Its first three
+runs all failed at the build step with `Cache export is not supported
+for the docker driver` (the workflow's `cache-to: type=gha` needs the
+`docker-container` buildx driver, which requires an explicit
+`docker/setup-buildx-action` step) — that step was added, and the
+workflow has since run successfully end to end (verified against
+GitHub's own Actions run history, both the `api` and `web` jobs green,
+not assumed from the workflow file alone). Check the
 [Actions tab](https://github.com/AkshitRampershad/incidentlab/actions/workflows/docker-publish.yml)
-for current status before relying on this path — if a run has since
-succeeded, the commands below work as described; until then, use Option
-A.
+for the current status of the latest run on `main` before relying on
+this path — a workflow succeeding once doesn't guarantee every future
+run will too, and the images at `ghcr.io/<owner>/incidentlab-*` only
+ever reflect whichever commit's run last completed.
 
 Once it works: replace the `build:` block for `api` and `web` in
 `docker-compose.yml` with `image:`, pointing at the published tags, then
