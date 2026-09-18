@@ -337,18 +337,6 @@ a real deployment, what's deliberately out of scope (TLS/reverse proxy,
 a managed Postgres, Ollama as a service, Alembic — each with its
 reasoning), and backup/log guidance.
 
-## Roadmap
-
-All 10 phases of the original build spec are implemented — that doesn't
-mean nothing's left. Concrete, disclosed gaps, not secretly-missing
-"phases": fixing the GHCR publish workflow so it actually succeeds;
-pushing the `v0.1.0` tag and publishing a GitHub Release (currently
-blocked by this session's git/tool permissions — a one-time manual
-action); a real OTel collector to visualize traces, not just print them;
-and the deployment gaps `docs/deployment.md` lists explicitly
-(TLS/reverse proxy, a managed Postgres, real horizontal scaling,
-Alembic).
-
 ## License
 
 Apache-2.0 — see `LICENSE`.
