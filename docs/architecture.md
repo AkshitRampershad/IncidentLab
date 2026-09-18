@@ -542,6 +542,16 @@ flowchart LR
   Fixed with a same-origin runtime-config route
   (`apps/web/app/api/config/route.ts`) reading a plain `API_URL` server
   var instead. See `docs/design-decisions.md` DDR-033 and DDR-034.
+- **Update (Render deployment, live):** the Blueprint above has since
+  been deployed (outside this sandbox, by the repo owner) and is live at
+  https://incidentlab-web.onrender.com (API:
+  https://incidentlab-api.onrender.com), on Render's free tier. It hit
+  one real bug in the process — `apps/web/Dockerfile`'s runner stage
+  didn't set `ENV HOSTNAME=0.0.0.0`, so Next's standalone server bound to
+  Render's auto-injected `HOSTNAME` (the service's own public hostname)
+  instead of all interfaces, causing a 502 — fixed by setting it
+  explicitly, confirmed working. See `docs/design-decisions.md` DDR-033's
+  update note.
 
 Same disclosure as every prior phase: this sandbox cannot pull images
 from Docker Hub — confirmed two distinct ways while working on this
@@ -588,3 +598,13 @@ tagged version anyone can actually point at:
   commit to `main` moments earlier; `git ls-remote --tags origin`
   confirms nothing reached `origin`. All three are one-time actions for
   the repo owner.
+
+**Update (repo owner request):** `CODE_OF_CONDUCT.md`, `CONTRIBUTING.md`,
+and `SECURITY.md` were later removed at the repo owner's explicit
+request, to drop the GitHub-generated community-profile tabs their
+presence causes and keep the repo's public-facing surface to just the
+README and Apache-2.0 `LICENSE`. `.github/ISSUE_TEMPLATE/`,
+`.github/pull_request_template.md`, `CHANGELOG.md`, and `README.md` were
+updated to drop their references to the three files; the templates and
+`CHANGELOG.md` itself were kept. See `docs/design-decisions.md` DDR-032's
+update note.

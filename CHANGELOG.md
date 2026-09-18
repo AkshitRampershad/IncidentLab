@@ -51,10 +51,12 @@ choice.
   (`docs/deployment.md`); pre-built images published to GHCR on every
   green `main` (`.github/workflows/docker-publish.yml` — its first three
   runs failed on a buildx configuration issue, since fixed and verified
-  working); a Render Blueprint (`render.yaml`) ready to deploy but not
-  yet deployed.
-- **Open source readiness:** `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`,
-  `SECURITY.md`, issue/PR templates.
+  working); a Render Blueprint (`render.yaml`) deployed to Render's free
+  tier at https://incidentlab-web.onrender.com (API:
+  https://incidentlab-api.onrender.com), subject to free-tier spin-down
+  and Postgres expiry.
+- **Open source readiness:** issue/PR templates; security vulnerability
+  reports go through GitHub's private security advisory form.
 
 ### Known limitations (see `docs/IMPLEMENTATION_STATUS.md` for the full, current list)
 

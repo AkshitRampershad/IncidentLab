@@ -23,9 +23,10 @@ body:
     attributes:
       label: Proposed approach
       description: >-
-        If you have one. For a new incident scenario specifically, see
-        CONTRIBUTING.md's "Adding a new incident scenario" section — it
-        needs several pieces together, not just a failure injector.
+        If you have one. For a new incident scenario specifically, it
+        needs several pieces together (a failure injector, scenario
+        registration, hypothesis patterns, and a test), not just a
+        failure injector.
   - type: textarea
     id: alternatives
     attributes:

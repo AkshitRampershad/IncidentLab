@@ -1188,6 +1188,18 @@ this file's own "Known limitations" sections throughout), which is the
 intended shape for an open-source project at this point, not a gap in
 the plan.
 
+**Update (repo owner request):** `CODE_OF_CONDUCT.md`, `CONTRIBUTING.md`,
+and `SECURITY.md` were removed at the repo owner's explicit request,
+after this phase and the "Post-release accuracy review" below, to drop
+the GitHub-generated community-profile tabs their presence causes and
+keep the repo's public-facing surface to just `README.md` and
+`LICENSE`. References to the three files were removed from
+`CHANGELOG.md`, the issue/PR templates, and `README.md`'s badges and
+Contributing section; the security-advisory contact link in
+`.github/ISSUE_TEMPLATE/config.yml` was kept as-is (it points at
+GitHub's own private reporting form, not at `SECURITY.md`). See
+`docs/design-decisions.md` DDR-032's update note.
+
 ---
 
 ## Post-release accuracy review
@@ -1254,6 +1266,19 @@ now with one addition:**
    confirm a run actually succeeds and an image lands on
    `ghcr.io/<owner>/incidentlab-api`/`-web` before re-describing GHCR
    publishing as working in any doc.
+
+**Update (GHCR fixed):** item 3 above was completed (by the repo owner
+directly, outside this session) — the missing
+`docker/setup-buildx-action@v3` step was added to
+`.github/workflows/docker-publish.yml`, and the workflow's next run
+succeeded: both the `api` and `web` jobs passed, confirmed against
+GitHub's real Actions run history (`mcp__github__actions_list`,
+`mcp__github__get_job_logs`) for that specific run, not assumed. Every
+place that had been corrected above to say GHCR publishing "has not yet
+succeeded" was corrected back — `README.md`, `docs/deployment.md`,
+`docs/architecture.md`, `CHANGELOG.md`, and the bug-report issue template
+now state that pre-built images are published. Items 1 and 2 above
+remain open.
 
 ---
 
@@ -1380,3 +1405,24 @@ against that build).
   build/runtime environment differs from what's assumed here in some
   other way, the first real deploy is where that would surface, not
   before.
+
+**Update (deployed, live):** the user applied this Blueprint on Render
+(outside this sandbox) and it is now live at
+https://incidentlab-web.onrender.com (API:
+https://incidentlab-api.onrender.com) — the "has never actually deployed"
+limitation above no longer holds. The real deploy did surface one
+environment difference this sandbox couldn't have caught: Render injects
+its own `HOSTNAME` environment variable (the service's public
+`*.onrender.com` hostname), which Next's standalone `server.js` binds to
+in preference to `0.0.0.0` when set, causing a 502
+(`EADDRNOTAVAIL`) even though the process itself started and passed its
+own health check. Fixed with an explicit `ENV HOSTNAME=0.0.0.0` in
+`apps/web/Dockerfile`'s runner stage (applied by the user directly,
+confirmed via `git show` and by the user testing the live URL
+afterward). A second, unrelated misconfiguration surfaced after that fix
+— the two `sync: false` values above were briefly entered pointing at
+the wrong service (`API_URL` set to the web service's own URL instead of
+the API's) — corrected to `API_URL=https://incidentlab-api.onrender.com`
+on `incidentlab-web` and `CORS_ALLOWED_ORIGINS=https://incidentlab-web.onrender.com`
+on `incidentlab-api`. See `docs/design-decisions.md` DDR-033's update
+note for the `HOSTNAME` bug in full.

@@ -2,7 +2,7 @@ blank_issues_enabled: true
 contact_links:
   - name: Security vulnerability
     url: https://github.com/AkshitRampershad/incidentlab/security/advisories/new
-    about: Please report security issues privately — see SECURITY.md. Do not open a public issue for these.
+    about: Please report security issues privately, not as a public issue.
   - name: Questions / discussion
     url: https://github.com/AkshitRampershad/incidentlab/discussions
     about: General questions that aren't a bug report or a concrete feature proposal.

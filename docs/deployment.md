@@ -112,15 +112,21 @@ dashboard, never in `render.yaml` — see "Do NOT commit secrets" in this
 doc's own scope) works the same way here as anywhere else in this
 project.
 
-**What's been verified about this path, and what hasn't:** every field
-in `render.yaml` was checked against Render's actual published Blueprint
-schema before being written (see DDR-034) — `docker compose config` was
-also re-run after this section's changes and still validates. Render
-itself has never actually built or deployed this Blueprint — `render.com`
-is unreachable from the sandbox this was written in, so no service was
-created, no cost was incurred, and no public URL exists as a result of
-writing this file. The steps above are correct by matching Render's
-documented behavior, not by having been clicked through.
+**What's been verified about this path:** every field in `render.yaml`
+was checked against Render's actual published Blueprint schema before
+being written (see DDR-034) — `docker compose config` was also re-run
+after this section's changes and still validates. `render.com` itself is
+unreachable from the sandbox this was written in, so the Blueprint
+couldn't be built or clicked through from here — but it has since been
+deployed (outside this sandbox, by the repo owner) and is live at
+https://incidentlab-web.onrender.com (API:
+https://incidentlab-api.onrender.com). It hit one real bug along the way
+— the standalone Next.js server binding to Render's auto-injected
+`HOSTNAME` instead of `0.0.0.0`, causing a 502 (see DDR-033's update and
+`apps/web/Dockerfile`'s `ENV HOSTNAME=0.0.0.0`) — since fixed and
+confirmed working. Remember the free-tier caveats: the free Postgres
+database expires 30 days after creation, and free services spin down
+after 15 minutes of inactivity (cold start on the next request).
 
 ## Required changes for a real deployment
 

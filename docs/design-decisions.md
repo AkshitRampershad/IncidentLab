@@ -937,6 +937,19 @@ is already on `origin/main`); GitHub's own "Draft a new release" UI can
 create the tag and the Release object together in one step, which also
 covers the second gap above.
 
+**Update (repo owner request):** `CODE_OF_CONDUCT.md`, `CONTRIBUTING.md`,
+and `SECURITY.md` were removed at the repo owner's explicit request, to
+drop the community-profile tabs GitHub auto-generates from their
+presence and keep the repo's public-facing surface to just the README
+and Apache-2.0 `LICENSE`. This doesn't reverse the reasoning above about
+why generic versions of these files would have been worse than none —
+it's a scope decision about which files this repository exposes, made
+after the fact by the person who owns that tradeoff. References to the
+three files were removed from `CHANGELOG.md`, issue/PR templates, and
+this README; the security-advisory contact link in
+`.github/ISSUE_TEMPLATE/config.yml` was kept (it points at GitHub's own
+private reporting form, not at `SECURITY.md`).
+
 ## DDR-033: the frontend's API base URL is resolved at container runtime via a same-origin route, not read from a `NEXT_PUBLIC_`-prefixed build-time variable
 
 **Context:** preparing an actual Render deployment (`render.yaml`)
@@ -999,6 +1012,22 @@ would need to be hardcoded per image build, defeating "environment-driven
 configuration" entirely. This fix doesn't touch CORS, evidence,
 agents, orchestration, or any product behavior — it's a deployment
 correctness fix, not a redesign.
+
+**Update (Render deployment, live):** this fix was necessary but not
+sufficient — the actual Render deployment (done outside this sandbox, by
+the repo owner) hit a second, independent bug: `apps/web/Dockerfile`'s
+runner stage didn't set `HOSTNAME`, so Next's standalone `server.js`
+(which binds to `process.env.HOSTNAME ?? "0.0.0.0"`) picked up Render's
+auto-injected `HOSTNAME` environment variable — set to the service's own
+public `*.onrender.com` hostname, not an address the container can
+actually bind to — causing a 502 (`EADDRNOTAVAIL`) despite the process
+starting successfully. Fixed with `ENV HOSTNAME=0.0.0.0` in the runner
+stage. Both bugs together are why a deployment can look correct by every
+static check (config validates, image builds, process starts) and still
+be unreachable — neither is caught by `docker compose config` or a local
+`docker compose up`, since local Compose never sets `HOSTNAME`. The
+deployment is now live: https://incidentlab-web.onrender.com (API:
+https://incidentlab-api.onrender.com).
 
 ## DDR-034: `render.yaml` reuses the existing Dockerfiles unchanged in shape, maps Postgres connection info field-by-field, and leaves two cross-service URLs for manual entry
 

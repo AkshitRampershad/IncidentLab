@@ -2,7 +2,6 @@
 
 [![CI](https://github.com/AkshitRampershad/incidentlab/actions/workflows/ci.yml/badge.svg)](https://github.com/AkshitRampershad/incidentlab/actions/workflows/ci.yml)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
-[![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg)](CODE_OF_CONDUCT.md)
 
 A multi-agent system that investigates software-production incidents —
 and a benchmark harness that measures whether that multi-agent approach
@@ -10,10 +9,15 @@ is actually worth its complexity, rather than assuming it.
 
 ## Live Demo
 
-Coming soon — no public deployment is live yet. The fastest way to see
-it today is to run it yourself: `docker compose up --build`, then open
-http://localhost:3000. See [Quick Start](#quick-start) below (under one
-minute if your machine already has Docker).
+**https://incidentlab-web.onrender.com** — deployed via the
+`render.yaml` Blueprint on Render's free tier (API at
+https://incidentlab-api.onrender.com). Free-tier caveats apply: the
+service spins down after 15 minutes of inactivity, so the first request
+after idle can take up to ~1 minute to respond, and the free Postgres
+database expires 30 days after creation. If it's unresponsive or you
+want a persistent instance, run it yourself: `docker compose up --build`,
+then open http://localhost:3000 — see [Quick Start](#quick-start) below
+(under one minute if your machine already has Docker).
 
 ## Project Status
 
@@ -35,10 +39,10 @@ consistently disclosed its own gaps rather than hide them:
   no Release on this repository's GitHub page as of this writing —
   `git tag`/`git log` locally do not reflect what's publicly visible on
   GitHub, and this README does not claim otherwise.
-- **A Render Blueprint (`render.yaml`) is ready but has not been
-  deployed.** No Render service has been created and no public URL
-  exists as a result of it being in this repo — see
-  [Deployment](#deployment) below.
+- **Deployed to Render** via the `render.yaml` Blueprint on the free
+  tier — see [Live Demo](#live-demo) above and
+  [Deployment](#deployment) below for the free-tier caveats (spin-down,
+  Postgres expiry).
 
 The full, itemized status — what shipped in each phase, what was
 verified how, and every known limitation — is
@@ -356,14 +360,15 @@ path. Beyond that:
   [Actions tab](https://github.com/AkshitRampershad/incidentlab/actions/workflows/docker-publish.yml)
   for the latest run's status before relying on a specific image tag
   being current.
-- **A Render Blueprint** (`render.yaml`) is ready for a $0-to-start
-  deployment (free web services + free Postgres) using the existing
-  Dockerfiles unchanged — see `docs/deployment.md`'s "Deploying to
-  Render" section for exact steps, the two values that must be entered
-  manually in Render's dashboard, and Render's own cost caveats (free
-  Postgres expires 30 days after creation; free services cold-start).
-  **This Blueprint has not been deployed** — no public URL exists as a
-  result of writing it.
+- **A Render Blueprint** (`render.yaml`) drives a $0-to-start deployment
+  (free web services + free Postgres) using the existing Dockerfiles
+  unchanged — see `docs/deployment.md`'s "Deploying to Render" section
+  for exact steps and the two values entered manually in Render's
+  dashboard. **It's deployed** at https://incidentlab-web.onrender.com
+  (API: https://incidentlab-api.onrender.com), subject to Render's free-tier
+  caveats: the free Postgres database expires 30 days after creation,
+  and free services spin down after 15 minutes of inactivity (cold
+  start on the next request).
 
 See `docs/deployment.md` for the full guide: required `.env` changes for
 a real deployment, what's deliberately out of scope (TLS/reverse proxy,
@@ -381,16 +386,6 @@ action); a real OTel collector to visualize traces, not just print them;
 and the deployment gaps `docs/deployment.md` lists explicitly
 (TLS/reverse proxy, a managed Postgres, real horizontal scaling,
 Alembic).
-
-## Contributing
-
-Contributions are welcome — see `CONTRIBUTING.md` for dev setup, this
-project's conventions (in particular: how design decisions get recorded
-in `docs/design-decisions.md`, and what a new incident scenario actually
-needs), and the PR checklist. This project follows the
-[Contributor Covenant](CODE_OF_CONDUCT.md). Report security issues
-privately per `SECURITY.md`, not as a public issue. `CHANGELOG.md` tracks
-what shipped in each release.
 
 ## License
 
