@@ -556,9 +556,14 @@ tagged version anyone can actually point at:
   distilled from `docs/IMPLEMENTATION_STATUS.md`'s exhaustive
   phase-by-phase log rather than duplicating it.
 - **`pyproject.toml`** — author and `[project.urls]` metadata.
-- A **`v0.1.0` git tag**, pushed — see DDR-032 for why this marks "every
-  phase of the build spec shipped," explicitly not "every disclosed
-  limitation resolved," and for the two GitHub-side actions (a Releases
-  UI entry, repo description/topics) this phase could not do from inside
-  this build environment — no available tool exposes either operation,
-  unlike the tag itself (a plain git operation).
+- A **`v0.1.0` git tag**, created locally — see DDR-032 for why this
+  marks "every phase of the build spec shipped," explicitly not "every
+  disclosed limitation resolved," and for three things this phase could
+  not complete from inside this build environment: a GitHub Release
+  object, the repo's description/topics (no available tool exposes
+  either), and — discovered while trying it, not assumed — actually
+  pushing the tag itself. `git push origin v0.1.0` returned a persistent
+  `HTTP 403` even though this session's credential had just pushed a
+  commit to `main` moments earlier; `git ls-remote --tags origin`
+  confirms nothing reached `origin`. All three are one-time actions for
+  the repo owner.

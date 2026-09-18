@@ -1077,7 +1077,9 @@ rather than glossing over it.
   every disclosed limitation is resolved; a new "Contributing" section
   linking `CONTRIBUTING.md`/`CODE_OF_CONDUCT.md`/`SECURITY.md`/
   `CHANGELOG.md`.
-- A `v0.1.0` annotated git tag, pushed to `origin`.
+- A `v0.1.0` annotated git tag, created locally (see "Known limitations"
+  below — pushing it hit a real, confirmed permission gap in this
+  session, not something silently skipped).
 - `docs/architecture.md` (Phase 10 slice) and `docs/design-decisions.md`
   (DDR-032).
 
@@ -1087,8 +1089,9 @@ rather than glossing over it.
 `.github/ISSUE_TEMPLATE/feature_request.yml` (new),
 `.github/ISSUE_TEMPLATE/config.yml` (new),
 `.github/pull_request_template.md` (new), `pyproject.toml`, `README.md`,
-`docs/architecture.md`, `docs/design-decisions.md`, plus the `v0.1.0`
-tag.
+`docs/architecture.md`, `docs/design-decisions.md`. The `v0.1.0` tag
+exists locally in this session only (see "Known limitations") — it is
+not part of the pushed commit history.
 
 **Tests added:** none — this phase is documentation and repository
 metadata, not application code. `uv sync` was re-run to confirm the
@@ -1106,18 +1109,34 @@ uv run pytest -q               # 189 passed (no new tests this phase —
                                # every prior phase
 uv run ruff check .            # All checks passed!
 uv run ruff format --check .   # clean
-git tag -a v0.1.0 -m "..."     # created
-git push origin v0.1.0         # pushed
+git tag -a v0.1.0 -m "..."     # created locally
+git push origin v0.1.0         # HTTP 403, retried once, still 403 —
+                                # NOT a transient network error: this
+                                # exact push mechanism had just pushed
+                                # this phase's own commit successfully
+                                # moments earlier. `git ls-remote --tags
+                                # origin` confirms no tag reached origin.
 ```
 
 **Known limitations:**
-- No GitHub Release object exists yet (a Releases-UI entry with release
-  notes attached to the `v0.1.0` tag) — no tool available in this
-  session's toolset exposes creating one (only reading existing
-  releases/tags), unlike the tag itself, which is a plain git operation.
-  A one-time, few-minute action for the repo owner: GitHub's "Draft a
-  new release" UI, pointed at the `v0.1.0` tag, with `CHANGELOG.md`'s
-  `[0.1.0]` section as the body.
+- **The `v0.1.0` tag itself never reached `origin`.** `git push origin
+  v0.1.0` returned a persistent `HTTP 403` (not a flake — retried once,
+  and this session's git credential had just successfully pushed a
+  commit to `main` via the same mechanism). This session's credential
+  can evidently push `refs/heads/*` but not create `refs/tags/*` — a
+  narrower permission scope than branch pushes, discovered by trying,
+  not assumed going in. The tag exists only in this session's local
+  clone and is lost once it ends. Recreating it is one command from a
+  machine with full push access: `git tag -a v0.1.0 -m "..." && git
+  push origin v0.1.0` against commit `4652168` (already on
+  `origin/main`) — or GitHub's own "Draft a new release" UI, which
+  creates the tag and a Release object together, also closing the next
+  gap below.
+- No GitHub Release object exists (a Releases-UI entry with release
+  notes attached to a tag) — no tool available in this session's toolset
+  exposes creating one (only reading existing releases/tags). A
+  one-time, few-minute action for the repo owner: GitHub's "Draft a new
+  release" UI, with `CHANGELOG.md`'s `[0.1.0]` section as the body.
 - The repository's GitHub-side description and topics are still unset —
   same reason: no available tool exposes that GitHub API surface. Also a
   one-time manual step (repo Settings, or the gear icon next to "About"

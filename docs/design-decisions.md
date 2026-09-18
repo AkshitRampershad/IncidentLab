@@ -868,7 +868,9 @@ someone re-proposes something already reasoned through, a PR template
 mirroring `CONTRIBUTING.md`'s checklist, `CHANGELOG.md` (a concise,
 release-facing summary distilled from `docs/IMPLEMENTATION_STATUS.md`'s
 exhaustive phase-by-phase log — deliberately not a duplicate of it),
-`pyproject.toml` author/URL metadata, and a `v0.1.0` git tag. The
+`pyproject.toml` author/URL metadata, and a `v0.1.0` annotated git tag
+(created locally; see "Why" below for why it isn't pushed from this
+session). The
 README's status line changed from "Phase 9 of 10" to "v0.1.0 — all 10
 phases complete," with an explicit sentence that "complete" means every
 phase shipped, not that every disclosed limitation is gone.
@@ -882,11 +884,23 @@ likely to be someone's first impression. A generic, copy-pasted
 `CONTRIBUTING.md` would actively mislead a first-time contributor about
 what this project actually expects (real Postgres in tests, DDRs for
 real decisions, no mocked-database shortcut) — worse than not having one.
-Two things this phase could not do from inside this build environment,
-and says so rather than silently skipping: creating an actual GitHub
-Release object (release notes attached to the tag, shown in the repo's
-Releases UI) and setting the repository's description/topics — no tool
-available here exposes either GitHub operation, unlike creating and
-pushing the tag itself (a plain git operation). Both are one-time,
-few-minute actions for the repo owner, not blockers to anything else in
-this phase.
+Three things this phase could not complete from inside this build
+environment, and says so rather than silently skipping or overclaiming:
+creating an actual GitHub Release object (release notes attached to a
+tag, shown in the repo's Releases UI) and setting the repository's
+description/topics — no tool available here exposes either GitHub
+operation — and, discovered while trying it, pushing the `v0.1.0` tag
+itself: `git push origin v0.1.0` returned a persistent `HTTP 403`
+(retried once; not a transient network reset, since the same push
+mechanism successfully pushed this phase's own commit moments earlier)
+— `git ls-remote --tags origin` confirms no tag reached `origin` at all.
+This session's git credential can evidently push to `refs/heads/*` but
+not create `refs/tags/*` — a plausible, narrower permission scope than
+branch pushes, not a bug in this project's own config. The tag exists
+only in this session's local clone and is lost once it ends. All three
+are one-time, few-minute actions for the repo owner — `git tag -a
+v0.1.0 -m "..." && git push origin v0.1.0` from a machine with full push
+access recreates the tag exactly (the commit it points at, `4652168`,
+is already on `origin/main`); GitHub's own "Draft a new release" UI can
+create the tag and the Release object together in one step, which also
+covers the second gap above.
