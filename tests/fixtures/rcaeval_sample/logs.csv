@@ -1,0 +1,168 @@
+time,timestamp,container_name,message,level,req_path,error,cluster_id,log_template
+21:35,1705354556172452550,frontend,request started,debug,/product/2ZYFJ3GM2N,,2,frontend request started
+21:35,1705354556294915871,frontend,request complete,debug,/product/OLJCESPC7Z,,10,frontend request complete
+21:35,1705354556455114455,frontend,request started,debug,/,,2,frontend request started
+21:35,1705354556571147123,currencyservice,conversion request successful,info,,,1,currencyservice conversion request successful
+21:35,1705354556772148073,currencyservice,conversion request successful,info,,,1,currencyservice conversion request successful
+21:35,1705354556965493724,cartservice,GetCartAsync called with userId=2de5b4a0-2f99-4a1e-b411-4c88b3e4ea68,,,,5,cartservice GetCartAsync called with userId=<:USERID:>
+21:35,1705354557093686798,frontend,request started,debug,/product/1YMWWN1N4O,,2,frontend request started
+21:35,1705354557204252265,frontend,request complete,debug,/product/1YMWWN1N4O,,10,frontend request complete
+21:35,1705354557389607203,frontend,request complete,debug,/product/0PUK6V6EV0,,10,frontend request complete
+21:35,1705354557532429333,currencyservice,conversion request successful,info,,,1,currencyservice conversion request successful
+21:35,1705354557669911563,cartservice,GetCartAsync called with userId=24262a89-f048-45bf-9e9c-53811d932e8f,,,,5,cartservice GetCartAsync called with userId=<:USERID:>
+21:35,1705354557776809856,recommendationservice,"[Recv ListRecommendations] product_ids=['1YMWWN1N4O', 'OLJCESPC7Z', 'LS4PSXUNUM', '0PUK6V6EV0', 'L9ECAV7KIM']",INFO,,,11,recommendationservice [Recv ListRecommendations] product ids=<:[PRODUCT IDS]:>
+21:35,1705354557868853921,frontend,request complete,debug,/cart/checkout,,10,frontend request complete
+21:35,1705354557964738802,currencyservice,Getting supported currencies...,info,,,4,currencyservice Getting supported currencies...
+21:35,1705354558071617912,currencyservice,Getting supported currencies...,info,,,4,currencyservice Getting supported currencies...
+21:35,1705354558194959304,cartservice,GetCartAsync called with userId=58b2e30e-81e2-4031-aa54-7fca441b3e0a,,,,5,cartservice GetCartAsync called with userId=<:USERID:>
+21:35,1705354558560252912,frontend,request started,debug,/product/L9ECAV7KIM,,2,frontend request started
+21:35,1705354558693962316,frontend,request complete,debug,/product/1YMWWN1N4O,,10,frontend request complete
+21:35,1705354559192367757,adservice,"received ad request (context_words=[hair, beauty])",INFO,,,9,adservice received ad request (context words=<:CONTEXT:>)
+21:35,1705354559270822117,frontend,request started,debug,/cart,,2,frontend request started
+21:35,1705354559375715710,currencyservice,conversion request successful,info,,,1,currencyservice conversion request successful
+21:35,1705354559478159583,recommendationservice,"[Recv ListRecommendations] product_ids=['6E92ZMYYFZ', '2ZYFJ3GM2N', 'L9ECAV7KIM', '9SIQT8TOJO', 'LS4PSXUNUM']",INFO,,,11,recommendationservice [Recv ListRecommendations] product ids=<:[PRODUCT IDS]:>
+21:35,1705354559514702970,frontend,view user cart,debug,/cart,,14,frontend view user cart
+21:35,1705354559581406805,recommendationservice,"[Recv ListRecommendations] product_ids=['6E92ZMYYFZ', '9SIQT8TOJO', 'L9ECAV7KIM', '66VCHSJNUP', 'LS4PSXUNUM']",INFO,,,11,recommendationservice [Recv ListRecommendations] product ids=<:[PRODUCT IDS]:>
+21:35,1705354559667839504,currencyservice,Getting supported currencies...,info,,,4,currencyservice Getting supported currencies...
+21:35,1705354559862064285,currencyservice,Getting supported currencies...,info,,,4,currencyservice Getting supported currencies...
+21:35,1705354559969683289,currencyservice,conversion request successful,info,,,1,currencyservice conversion request successful
+21:36,1705354560005256882,frontend,request complete,debug,/cart,,10,frontend request complete
+21:36,1705354560075959147,recommendationservice,"[Recv ListRecommendations] product_ids=['2ZYFJ3GM2N', 'OLJCESPC7Z', '9SIQT8TOJO', '0PUK6V6EV0', 'LS4PSXUNUM']",INFO,,,11,recommendationservice [Recv ListRecommendations] product ids=<:[PRODUCT IDS]:>
+21:36,1705354560169389249,currencyservice,conversion request successful,info,,,1,currencyservice conversion request successful
+21:36,1705354560280392878,recommendationservice,"[Recv ListRecommendations] product_ids=['L9ECAV7KIM', 'LS4PSXUNUM', '1YMWWN1N4O', '9SIQT8TOJO', '6E92ZMYYFZ']",INFO,,,11,recommendationservice [Recv ListRecommendations] product ids=<:[PRODUCT IDS]:>
+21:36,1705354560398878332,frontend,home,info,/,,19,frontend home
+21:36,1705354560477965982,cartservice,GetCartAsync called with userId=5dafc459-dfcc-45fb-b7fb-999e59304f92,,,,5,cartservice GetCartAsync called with userId=<:USERID:>
+21:36,1705354560581128861,recommendationservice,"[Recv ListRecommendations] product_ids=['0PUK6V6EV0', '2ZYFJ3GM2N', 'L9ECAV7KIM', '1YMWWN1N4O', '6E92ZMYYFZ']",INFO,,,11,recommendationservice [Recv ListRecommendations] product ids=<:[PRODUCT IDS]:>
+21:36,1705354560662070283,currencyservice,Getting supported currencies...,info,,,4,currencyservice Getting supported currencies...
+21:36,1705354560679681665,recommendationservice,"[Recv ListRecommendations] product_ids=['9SIQT8TOJO', '0PUK6V6EV0', '2ZYFJ3GM2N', '1YMWWN1N4O', 'L9ECAV7KIM']",INFO,,,11,recommendationservice [Recv ListRecommendations] product ids=<:[PRODUCT IDS]:>
+21:36,1705354560774678920,cartservice,GetCartAsync called with userId=f1e8598c-1238-49ca-9934-128fbb2a848a,,,,5,cartservice GetCartAsync called with userId=<:USERID:>
+21:36,1705354560867644890,currencyservice,conversion request successful,info,,,1,currencyservice conversion request successful
+21:36,1705354560894123046,shippingservice,[GetQuote] received request,info,,,15,shippingservice [GetQuote] received request
+21:36,1705354560977522035,cartservice,GetCartAsync called with userId=940d3cd5-31db-4b3f-a9bb-eeb9fe4f62b4,,,,5,cartservice GetCartAsync called with userId=<:USERID:>
+21:36,1705354561105903091,frontend,serving product page,debug,/product/L9ECAV7KIM,,3,frontend serving product page
+21:36,1705354561179350914,frontend,request started,debug,/cart/checkout,,2,frontend request started
+21:36,1705354561209987881,cartservice,"AddItemAsync called with userId=940d3cd5-31db-4b3f-a9bb-eeb9fe4f62b4, productId=LS4PSXUNUM, quantity=10",,,,13,"cartservice AddItemAsync called with userId=<:USERID:>, productId=<:PRODUCT ID:>, quantity=<:QUANTITY:>"
+21:36,1705354561364127789,currencyservice,conversion request successful,info,,,1,currencyservice conversion request successful
+21:36,1705354561385283640,recommendationservice,"[Recv ListRecommendations] product_ids=['L9ECAV7KIM', '1YMWWN1N4O', 'OLJCESPC7Z', '9SIQT8TOJO', '66VCHSJNUP']",INFO,,,11,recommendationservice [Recv ListRecommendations] product ids=<:[PRODUCT IDS]:>
+21:36,1705354561482376396,frontend,request started,debug,/product/9SIQT8TOJO,,2,frontend request started
+21:36,1705354561562063484,currencyservice,conversion request successful,info,,,1,currencyservice conversion request successful
+21:36,1705354561575230928,shippingservice,[GetQuote] received request,info,,,15,shippingservice [GetQuote] received request
+21:36,1705354561677142155,paymentservice,Transaction processed: visa ending 0454     Amount: CAD208.567012820,info,,,23,paymentservice Transaction processed: visa ending <:NUM:> Amount:<:MONEY:>
+21:36,1705354561683689716,checkoutservice,payment went through (transaction_id: 10861b78-834b-4961-a391-779a8cc7797f),info,,,24,checkoutservice payment went through (transaction id<:TRANSACTION ID:>
+21:36,1705354561696967310,frontend,order placed,info,/cart/checkout,,30,frontend order placed
+21:36,1705354561762141694,currencyservice,conversion request successful,info,,,1,currencyservice conversion request successful
+21:36,1705354561869715845,frontend,request complete,debug,/cart/checkout,,10,frontend request complete
+21:36,1705354561965236040,frontend,env platform is either empty or invalid,,,,6,frontend env platform is either empty or invalid
+21:36,1705354561983664146,checkoutservice,"order confirmation email sent to ""someone@example.com""",info,,,29,"checkoutservice order confirmation email sent to ""someone@example.com"""
+21:36,1705354562075659819,recommendationservice,"[Recv ListRecommendations] product_ids=['9SIQT8TOJO', '1YMWWN1N4O', 'OLJCESPC7Z', '6E92ZMYYFZ', 'LS4PSXUNUM']",INFO,,,11,recommendationservice [Recv ListRecommendations] product ids=<:[PRODUCT IDS]:>
+21:36,1705354562262125555,currencyservice,conversion request successful,info,,,1,currencyservice conversion request successful
+21:36,1705354562369261465,cartservice,GetCartAsync called with userId=f5c61ca9-d183-48df-a8ef-d164999d5dc5,,,,5,cartservice GetCartAsync called with userId=<:USERID:>
+21:36,1705354562790686370,frontend,home,info,/,,19,frontend home
+21:36,1705354562972178837,currencyservice,conversion request successful,info,,,1,currencyservice conversion request successful
+21:36,1705354563171102956,recommendationservice,"[Recv ListRecommendations] product_ids=['6E92ZMYYFZ', '1YMWWN1N4O', 'L9ECAV7KIM', 'OLJCESPC7Z', 'LS4PSXUNUM']",INFO,,,11,recommendationservice [Recv ListRecommendations] product ids=<:[PRODUCT IDS]:>
+21:36,1705354563402848309,frontend,serving product page,debug,/product/LS4PSXUNUM,,3,frontend serving product page
+21:36,1705354563566443990,currencyservice,Getting supported currencies...,info,,,4,currencyservice Getting supported currencies...
+21:36,1705354563633415387,frontend,request started,debug,/cart,,2,frontend request started
+21:36,1705354563701735797,recommendationservice,"[Recv ListRecommendations] product_ids=['9SIQT8TOJO', 'L9ECAV7KIM', 'LS4PSXUNUM', '6E92ZMYYFZ', 'OLJCESPC7Z']",INFO,,,11,recommendationservice [Recv ListRecommendations] product ids=<:[PRODUCT IDS]:>
+21:36,1705354563726264361,cartservice,"AddItemAsync called with userId=e0af662b-b550-4be6-8bc2-5b0e52c29b00, productId=OLJCESPC7Z, quantity=2",,,,13,"cartservice AddItemAsync called with userId=<:USERID:>, productId=<:PRODUCT ID:>, quantity=<:QUANTITY:>"
+21:36,1705354563797226145,shippingservice,[GetQuote] received request,info,,,15,shippingservice [GetQuote] received request
+21:36,1705354563895820976,frontend,adding to cart,debug,/cart,,12,frontend adding to cart
+21:36,1705354564065194670,currencyservice,Getting supported currencies...,info,,,4,currencyservice Getting supported currencies...
+21:36,1705354564262420054,currencyservice,conversion request successful,info,,,1,currencyservice conversion request successful
+21:36,1705354564272746101,recommendationservice,"[Recv ListRecommendations] product_ids=['2ZYFJ3GM2N', '1YMWWN1N4O', '6E92ZMYYFZ', '0PUK6V6EV0', 'LS4PSXUNUM']",INFO,,,11,recommendationservice [Recv ListRecommendations] product ids=<:[PRODUCT IDS]:>
+21:36,1705354564394983450,adservice,received ad request (context_words=[accessories]),INFO,,,9,adservice received ad request (context words=<:CONTEXT:>)
+21:36,1705354564473037802,checkoutservice,"[PlaceOrder] user_id=""e0af662b-b550-4be6-8bc2-5b0e52c29b00"" user_currency=""CAD""",info,,,21,"checkoutservice [PlaceOrder] user id=""<:USERID:>"" user currency=<:CUR:>"
+21:36,1705354564670694560,cartservice,GetCartAsync called with userId=77cc67a9-3828-410c-a117-d90c9628cef1,,,,5,cartservice GetCartAsync called with userId=<:USERID:>
+21:36,1705354564776716704,shippingservice,[ShipOrder] received request,info,,,25,shippingservice [ShipOrder] received request
+21:36,1705354564802139486,frontend,request started,debug,/cart,,2,frontend request started
+21:36,1705354564876145636,frontend,placing order,debug,/cart/checkout,,20,frontend placing order
+21:36,1705354564966258654,currencyservice,conversion request successful,info,,,1,currencyservice conversion request successful
+21:36,1705354565072112728,cartservice,GetCartAsync called with userId=7fe14726-5010-4ee3-8877-fb13ac9e8154,,,,5,cartservice GetCartAsync called with userId=<:USERID:>
+21:36,1705354565176781341,frontend,placing order,debug,/cart/checkout,,20,frontend placing order
+21:36,1705354565282465369,checkoutservice,"order confirmation email sent to ""someone@example.com""",info,,,29,"checkoutservice order confirmation email sent to ""someone@example.com"""
+21:36,1705354565375065713,cartservice,EmptyCartAsync called with userId=77cc67a9-3828-410c-a117-d90c9628cef1,,,,27,cartservice EmptyCartAsync called with userId=<:USERID:>
+21:36,1705354565742675534,currencyservice,conversion request successful,info,,,1,currencyservice conversion request successful
+21:36,1705354566100329887,frontend,request complete,debug,/product/L9ECAV7KIM,,10,frontend request complete
+21:36,1705354566200135471,frontend,request started,debug,/product/66VCHSJNUP,,2,frontend request started
+21:36,1705354566286414566,recommendationservice,"[Recv ListRecommendations] product_ids=['2ZYFJ3GM2N', 'L9ECAV7KIM', 'LS4PSXUNUM', '9SIQT8TOJO', '66VCHSJNUP']",INFO,,,11,recommendationservice [Recv ListRecommendations] product ids=<:[PRODUCT IDS]:>
+21:36,1705354566402048946,shippingservice,[GetQuote] received request,info,,,15,shippingservice [GetQuote] received request
+21:36,1705354566567563146,currencyservice,Getting supported currencies...,info,,,4,currencyservice Getting supported currencies...
+21:36,1705354566622053401,frontend,request complete,debug,/setCurrency,,10,frontend request complete
+21:36,1705354566767117122,currencyservice,Getting supported currencies...,info,,,4,currencyservice Getting supported currencies...
+21:36,1705354566870367823,currencyservice,conversion request successful,info,,,1,currencyservice conversion request successful
+21:36,1705354567077361703,cartservice,Checking CartService Health,,,,17,cartservice Checking CartService Health
+21:36,1705354567369407384,currencyservice,conversion request successful,info,,,1,currencyservice conversion request successful
+21:36,1705354567418639424,frontend,serving product page,debug,/product/LS4PSXUNUM,,3,frontend serving product page
+21:36,1705354567477710153,cartservice,GetCartAsync called with userId=f449362b-6128-42ef-8301-c111232d72ec,,,,5,cartservice GetCartAsync called with userId=<:USERID:>
+21:36,1705354567571640780,currencyservice,conversion request successful,info,,,1,currencyservice conversion request successful
+21:36,1705354567604684861,frontend,serving product page,debug,/product/LS4PSXUNUM,,3,frontend serving product page
+21:36,1705354567766972855,currencyservice,conversion request successful,info,,,1,currencyservice conversion request successful
+21:36,1705354567871175022,currencyservice,conversion request successful,info,,,1,currencyservice conversion request successful
+21:36,1705354567968496254,currencyservice,conversion request successful,info,,,1,currencyservice conversion request successful
+21:36,1705354568009184791,frontend,request complete,debug,/cart,,10,frontend request complete
+21:36,1705354568367655250,frontend,env platform is either empty or invalid,,,,6,frontend env platform is either empty or invalid
+21:36,1705354568370636649,adservice,received ad request (context_words=[]),INFO,,,9,adservice received ad request (context words=<:CONTEXT:>)
+21:36,1705354568571548969,currencyservice,conversion request successful,info,,,1,currencyservice conversion request successful
+21:36,1705354568673643838,currencyservice,conversion request successful,info,,,1,currencyservice conversion request successful
+21:36,1705354568992394146,frontend,request complete,debug,/product/2ZYFJ3GM2N,,10,frontend request complete
+21:36,1705354569166708130,currencyservice,conversion request successful,info,,,1,currencyservice conversion request successful
+21:36,1705354569267389512,currencyservice,conversion request successful,info,,,1,currencyservice conversion request successful
+21:36,1705354569362891406,currencyservice,conversion request successful,info,,,1,currencyservice conversion request successful
+21:36,1705354569400603476,frontend,request complete,debug,/product/9SIQT8TOJO,,10,frontend request complete
+21:36,1705354569476494753,cartservice,GetCartAsync called with userId=e2f1473d-4951-455b-80d3-a4c651f40a99,,,,5,cartservice GetCartAsync called with userId=<:USERID:>
+21:36,1705354569568273363,currencyservice,conversion request successful,info,,,1,currencyservice conversion request successful
+21:36,1705354569673531175,currencyservice,conversion request successful,info,,,1,currencyservice conversion request successful
+21:36,1705354569794171591,adservice,received ad request (context_words=[accessories]),INFO,,,9,adservice received ad request (context words=<:CONTEXT:>)
+21:36,1705354569873374704,frontend,request complete,debug,/,,10,frontend request complete
+21:36,1705354569880301589,frontend,request complete,debug,/,,10,frontend request complete
+21:36,1705354569993007482,frontend,request complete,debug,/product/9SIQT8TOJO,,10,frontend request complete
+21:36,1705354570162056383,currencyservice,conversion request successful,info,,,1,currencyservice conversion request successful
+21:36,1705354570461940477,currencyservice,Getting supported currencies...,info,,,4,currencyservice Getting supported currencies...
+21:36,1705354570592587514,frontend,request complete,debug,/product/L9ECAV7KIM,,10,frontend request complete
+21:36,1705354570706428818,frontend,adding to cart,debug,/cart,,12,frontend adding to cart
+21:36,1705354570968976057,currencyservice,conversion request successful,info,,,1,currencyservice conversion request successful
+21:36,1705354571070251461,frontend,request complete,debug,/cart,,10,frontend request complete
+21:36,1705354571185239301,frontend,serving product page,debug,/product/L9ECAV7KIM,,3,frontend serving product page
+21:36,1705354571366751823,currencyservice,conversion request successful,info,,,1,currencyservice conversion request successful
+21:36,1705354571497614096,shippingservice,[GetQuote] completed request,info,,,16,shippingservice [GetQuote] completed request
+21:36,1705354571570848141,currencyservice,Getting supported currencies...,info,,,4,currencyservice Getting supported currencies...
+21:36,1705354571610209752,recommendationservice,"[Recv ListRecommendations] product_ids=['OLJCESPC7Z', 'LS4PSXUNUM', '1YMWWN1N4O', '0PUK6V6EV0', '6E92ZMYYFZ']",INFO,,,11,recommendationservice [Recv ListRecommendations] product ids=<:[PRODUCT IDS]:>
+21:36,1705354571768920745,frontend,env platform is either empty or invalid,,,,6,frontend env platform is either empty or invalid
+21:36,1705354571872080539,frontend,"Detected Google metadata server: [169.254.169.254], setting ENV_PLATFORM to GCP.",debug,/,,7,"frontend Detected Google metadata server: [<:IP:>], setting ENV PLATFORM to GCP."
+21:36,1705354572069371843,frontend,ENV_PLATFORM is: gcp,debug,/,,8,frontend ENV PLATFORM is: gcp
+21:36,1705354572162753681,currencyservice,Getting supported currencies...,info,,,4,currencyservice Getting supported currencies...
+21:36,1705354572283698323,recommendationservice,"[Recv ListRecommendations] product_ids=['LS4PSXUNUM', '9SIQT8TOJO', 'L9ECAV7KIM', '66VCHSJNUP', '2ZYFJ3GM2N']",INFO,,,11,recommendationservice [Recv ListRecommendations] product ids=<:[PRODUCT IDS]:>
+21:36,1705354572565275224,currencyservice,Getting supported currencies...,info,,,4,currencyservice Getting supported currencies...
+21:36,1705354572694151899,frontend,adding to cart,debug,/cart,,12,frontend adding to cart
+21:36,1705354572862629406,currencyservice,Getting supported currencies...,info,,,4,currencyservice Getting supported currencies...
+21:36,1705354572975107378,currencyservice,conversion request successful,info,,,1,currencyservice conversion request successful
+21:36,1705354573062475294,currencyservice,Getting supported currencies...,info,,,4,currencyservice Getting supported currencies...
+21:36,1705354573168841345,cartservice,GetCartAsync called with userId=3a372cf6-919e-4b02-a39e-3c0e2694a8e4,,,,5,cartservice GetCartAsync called with userId=<:USERID:>
+21:36,1705354573294790038,adservice,received ad request (context_words=[footwear]),INFO,,,9,adservice received ad request (context words=<:CONTEXT:>)
+21:36,1705354573389376201,frontend,request complete,debug,/product/0PUK6V6EV0,,10,frontend request complete
+21:36,1705354573572039010,currencyservice,conversion request successful,info,,,1,currencyservice conversion request successful
+21:36,1705354573762936538,currencyservice,conversion request successful,info,,,1,currencyservice conversion request successful
+21:36,1705354573874199341,recommendationservice,"[Recv ListRecommendations] product_ids=['L9ECAV7KIM', '0PUK6V6EV0', '9SIQT8TOJO', '66VCHSJNUP', '6E92ZMYYFZ']",INFO,,,11,recommendationservice [Recv ListRecommendations] product ids=<:[PRODUCT IDS]:>
+21:36,1705354573966852035,cartservice,GetCartAsync called with userId=e6020cfe-1408-4cea-81dc-f53ea29878b1,,,,5,cartservice GetCartAsync called with userId=<:USERID:>
+21:36,1705354574072435310,currencyservice,conversion request successful,info,,,1,currencyservice conversion request successful
+21:36,1705354574173211488,frontend,placing order,debug,/cart/checkout,,20,frontend placing order
+21:36,1705354574305002884,adservice,"received ad request (context_words=[clothing, tops])",INFO,,,9,adservice received ad request (context words=<:CONTEXT:>)
+21:36,1705354574465617190,currencyservice,Getting supported currencies...,info,,,4,currencyservice Getting supported currencies...
+21:36,1705354574532952397,frontend,setting currency,debug,/setCurrency,,18,frontend setting currency
+21:36,1705354574573424927,adservice,received ad request (context_words=[]),INFO,,,9,adservice received ad request (context words=<:CONTEXT:>)
+21:36,1705354574662056444,currencyservice,conversion request successful,info,,,1,currencyservice conversion request successful
+21:36,1705354574768166324,currencyservice,Getting supported currencies...,info,,,4,currencyservice Getting supported currencies...
+21:36,1705354574889707062,adservice,received ad request (context_words=[footwear]),INFO,,,9,adservice received ad request (context words=<:CONTEXT:>)
+21:36,1705354575004971616,frontend,request started,debug,/product/6E92ZMYYFZ,,2,frontend request started
+21:36,1705354575076062110,cartservice,GetCartAsync called with userId=dddff28d-7eaa-44d9-a99a-39e8c13858ac,,,,5,cartservice GetCartAsync called with userId=<:USERID:>
+21:36,1705354575115702252,frontend,request complete,debug,/cart,,10,frontend request complete
+21:36,1705354575178720697,recommendationservice,"[Recv ListRecommendations] product_ids=['1YMWWN1N4O', '66VCHSJNUP', '2ZYFJ3GM2N', 'OLJCESPC7Z', '0PUK6V6EV0']",INFO,,,11,recommendationservice [Recv ListRecommendations] product ids=<:[PRODUCT IDS]:>
+21:36,1705354575223314845,frontend,serving product page,debug,/product/1YMWWN1N4O,,3,frontend serving product page
+21:36,1705354575272996711,adservice,received ad request (context_words=[]),INFO,,,9,adservice received ad request (context words=<:CONTEXT:>)
+21:36,1705354575389797100,adservice,received ad request (context_words=[accessories]),INFO,,,9,adservice received ad request (context words=<:CONTEXT:>)
+21:36,1705354575474242716,currencyservice,conversion request successful,info,,,1,currencyservice conversion request successful
+21:36,1705354575572679221,currencyservice,conversion request successful,info,,,1,currencyservice conversion request successful
+21:36,1705354575595348774,shippingservice,[GetQuote] completed request,info,,,16,shippingservice [GetQuote] completed request
+21:36,1705354575701478366,frontend,adding to cart,debug,/cart,,12,frontend adding to cart
+21:36,1705354575868521201,currencyservice,conversion request successful,info,,,1,currencyservice conversion request successful
+21:36,1705354575897344090,adservice,received ad request (context_words=[accessories]),INFO,,,9,adservice received ad request (context words=<:CONTEXT:>)

@@ -344,6 +344,28 @@ dataset size; `--llm` attempts a real model for nicer summaries — the
 scored results don't change, since only free-text narration depends on
 it).
 
+### Testing with real data
+
+Every scenario above is synthetic by design (`docs/design-decisions.md`
+DDR-007) — reproducible on purpose, not a real running system. To
+investigate real telemetry instead:
+
+```bash
+make import-real-data CASE=path/to/rcaeval-case \
+  ROOT_CAUSE=cpu_stress COMPONENT=checkoutservice TRIGGER=resource_exhaustion
+```
+
+Imports one real failure case from
+[RCAEval](https://github.com/phamquiluan/RCAEval) — real per-service
+metrics and logs from an actual chaos-engineering run, not authored data
+— as an incident you can investigate the same way. RCAEval's own
+735 *labeled* cases (a `root_cause`/`fault` already attached) live on
+Zenodo and Hugging Face; `docs/design-decisions.md` DDR-035 has the full
+mapping, the real anomaly found by inspection while verifying it (a
+genuine ~30x CPU spike in a downloaded sample case), and what's
+deliberately left empty rather than fabricated (no deploy records,
+nothing labeled a distractor).
+
 ## Deployment
 
 `docker compose up --build` (above) works today and is the verified

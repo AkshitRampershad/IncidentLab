@@ -1426,3 +1426,69 @@ the API's) — corrected to `API_URL=https://incidentlab-api.onrender.com`
 on `incidentlab-web` and `CORS_ALLOWED_ORIGINS=https://incidentlab-web.onrender.com`
 on `incidentlab-api`. See `docs/design-decisions.md` DDR-033's update
 note for the `HOSTNAME` bug in full.
+
+---
+
+## Real-data import (RCAEval)
+
+Not a new phase — added at the user's request, asking where to find real
+data to test the app with. Every existing scenario is synthetic by
+design (DDR-007); this adds a second, real-data path alongside it rather
+than replacing it.
+
+**Implemented:**
+- `simulator/rcaeval_import.py` (new) — parses a real RCAEval
+  (github.com/phamquiluan/RCAEval) failure-case directory (`metrics.csv`,
+  `logs.csv`, `inject_time.txt`) into the same `IncidentDraft` shape a
+  synthetic `FailureInjector` produces: melts the wide per-second
+  `metrics.csv` into `MetricPoint` rows, windows and caps the real log
+  volume (RCAEval's own data runs ~100+ lines/second), and always leaves
+  `deployments=[]` and every `is_distractor=False` — RCAEval has no
+  deploy data, and nothing in real telemetry was deliberately planted as
+  a red herring, so neither is fabricated.
+- `simulator/replay.py` — persistence logic extracted into a shared
+  `persist_incident_draft()`, called by both `run_scenario()` (synthetic)
+  and the new import script, so an imported incident is stored and
+  investigatable identically to any other.
+- `make import-real-data` (Makefile) — CLI entry point.
+- `tests/fixtures/rcaeval_sample/` (new) — a small, real, trimmed slice
+  of an actual downloaded RCAEval case, used by
+  `tests/unit/test_rcaeval_import.py`'s 11 tests (melting correctness,
+  distractor/deployment honesty, window/anchor behavior, determinism).
+
+**Verified, not assumed:** the real case bundle
+(`multi-source-data.zip`, RCAEval's own GitHub-release demo, an actual
+chaos-engineering run against Online Boutique) was downloaded and
+inspected directly — its exact column layout drove the parser, not a
+guess from the README. The full untrimmed case (1,441 metric rows,
+~171k log rows) was run through `build_incident_draft()` end-to-end
+(0.51s, 300 capped logs, 6,552 metric points) to confirm real-world
+performance, and the real `checkoutservice_cpu` spike (~0.5 → 14+
+average in the 2 minutes after `inject_time.txt`) was confirmed to
+survive the import unchanged. `uv run pytest -q --ignore=tests/integration`
+(110 passed, up from 99), `ruff check .` and `ruff format .` (clean).
+
+**Known limitations, disclosed rather than papered over:**
+- **This bundle is unlabeled.** RCAEval's 735 cases with an actual
+  ground-truth root cause live on Zenodo and Hugging Face, both
+  unreachable from this sandbox's egress policy — so `--root-cause`,
+  `--affected-component`, and `--trigger` are required CLI flags here,
+  filled in from a real anomaly found by inspection (the CPU spike
+  above), not from an authoritative label. Pointed at a labeled Zenodo
+  case instead, those three values are already encoded in that case's
+  own directory name / `cases.parquet` row.
+- **Auto-scoring isn't wired up.** `evaluation/ground_truth.py`'s
+  `_ROOT_CAUSE_TO_HYPOTHESIS` mapping only covers the two synthetic
+  scenarios' root-cause strings — an imported incident can be
+  investigated end-to-end (`make investigate INCIDENT=...`) but not
+  auto-scored by `evaluation/reports.py` until that mapping is extended
+  for whatever root-cause string was supplied at import time. The import
+  CLI prints this after every run.
+- Requires a real Postgres to actually persist and investigate (same
+  requirement every other scenario already has) — not verified against
+  a running database in this sandbox, same disclosed gap as every other
+  phase here.
+
+See `docs/design-decisions.md` DDR-035 for the full reasoning, including
+why this is a standalone script rather than a `FailureInjector`
+subclass.

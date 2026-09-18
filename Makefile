@@ -1,4 +1,4 @@
-.PHONY: setup dev test lint format incident investigate evaluate benchmark reset clean
+.PHONY: setup dev test lint format incident import-real-data investigate evaluate benchmark reset clean
 
 setup: ## Install Python and Node dependencies for local (non-Docker) development.
 	uv sync
@@ -26,6 +26,11 @@ clean: reset ## Remove local build/dependency artifacts.
 incident: ## Generate a reproducible incident: make incident SCENARIO=db_connection_pool
 	@test -n "$(SCENARIO)" || (echo "Usage: make incident SCENARIO=<id> (e.g. db_connection_pool)"; exit 1)
 	uv run python -m simulator.replay --scenario $(SCENARIO)
+
+import-real-data: ## Import a real RCAEval case: make import-real-data CASE=path/to/case ROOT_CAUSE=cpu_stress COMPONENT=checkoutservice TRIGGER=resource_exhaustion
+	@test -n "$(CASE)" || (echo "Usage: make import-real-data CASE=<dir> ROOT_CAUSE=<str> COMPONENT=<service> TRIGGER=<str>"; exit 1)
+	uv run python -m simulator.rcaeval_import $(CASE) \
+		--root-cause "$(ROOT_CAUSE)" --affected-component "$(COMPONENT)" --trigger "$(TRIGGER)"
 
 investigate: ## Run a full investigation: make investigate INCIDENT=INC-0001
 	@test -n "$(INCIDENT)" || (echo "Usage: make investigate INCIDENT=<id> (e.g. INC-0001)"; exit 1)

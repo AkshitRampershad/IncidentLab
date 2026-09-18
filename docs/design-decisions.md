@@ -1091,3 +1091,82 @@ free services, a cold visitor can hit both delays back to back). Neither
 is something `render.yaml` can change; both are Render account-level
 Render platform behavior, stated in `docs/deployment.md` rather than
 implied away by "this should be $0."
+
+## DDR-035: real failure cases (RCAEval) are imported via a standalone script, not a `FailureInjector` subclass, and their ground truth is supplied by the caller, not invented
+
+**Context:** the user asked where to find real data to test this app
+with. Every existing scenario (`simulator/failure_injector/`) is
+synthetic by deliberate design (DDR-007: no real running system, so a
+scenario replays byte-for-byte identically given the same `anchor_time`).
+That's the right choice for the benchmark's own reproducibility, but it
+means nothing in this repo had ever been exercised against telemetry
+from an actual, imperfect running system — only hand-authored data
+shaped exactly like the pattern each scenario means to teach.
+
+Researched public options against `simulator/models.py`'s actual schema
+(`LogEvent`, `MetricPoint`, `Deployment`, all tied to a `GroundTruth`):
+RCAEval (github.com/phamquiluan/RCAEval — FSE'26/WWW'25/ASE'24) was the
+best fit, since it ships real per-service metrics *and* real logs *and*
+a labeled root cause for 735 failure cases from real chaos-engineering
+runs against three open-source microservice systems, rather than just
+raw log text with no fault labels (LogHub) or a system you'd have to run
+and inject faults into yourself (TrainTicket standalone).
+
+**Decision:** `simulator/rcaeval_import.py` (new) parses an RCAEval case
+directory — `metrics.csv` (wide: one column per `{service}_{metric}`
+pair), `logs.csv`, `inject_time.txt` — and builds the exact same
+`IncidentDraft` a `FailureInjector` would, melting the wide metrics into
+one `MetricPoint` per (service, metric, timestamp) and windowing +
+capping the real log volume (RCAEval's own data runs ~100+ lines/second
+— importing it wholesale isn't reasonable). `simulator/replay.py`'s
+persistence logic was extracted into a shared `persist_incident_draft()`
+so both the synthetic and real-data paths write to the same tables the
+same way — an imported incident is investigatable exactly like any other
+(`make investigate INCIDENT=...`), no special-casing anywhere else in
+the codebase. Deliberately **not** wired in as a `FailureInjector`
+subclass: that ABC's contract is regenerating byte-identical output from
+just an `anchor_time`, which fits a hand-authored scenario but not a
+fixed real recording — forcing that shape on it would mean either
+ignoring the file entirely (defeats the purpose) or quietly parameterizing
+`generate()` with a case path never expressed in the ABC's signature.
+
+`--root-cause`/`--affected-component`/`--trigger` are required CLI
+arguments, not read from the case directory. RCAEval's actual labels
+(the `{benchmark}_{service}_{fault}_{instance}` directory-name
+convention, or the `cases.parquet` index) live in their 735-case
+Zenodo/Hugging Face release — both domains were unreachable from this
+sandbox's egress policy. The only case size small enough to actually
+pull from here was RCAEval's own GitHub-release demo bundle
+(`multi-source-data.zip`, real telemetry from an Online Boutique run,
+12MB), which ships with no label at all. Rather than invent one, the
+script requires the caller to supply it — and a real anomaly was found
+in that bundle by inspection, not assumed: `checkoutservice_cpu` jumps
+roughly 30x (0.5 → 14+ average) in the 2 minutes after `inject_time.txt`,
+consistent with a CPU-stress fault. Pointed at a real labeled Zenodo case
+instead, those three flags would be filled from that case's own metadata
+rather than typed by hand.
+
+`deployments` is always `[]` for an imported incident — RCAEval carries
+no deploy/version data, and fabricating one to fill the field would
+misrepresent it as real. Every imported log/metric has
+`is_distractor=False`: a synthetic scenario plants deliberate red
+herrings and labels them; real telemetry's noise isn't deliberately
+planted by anyone, so labeling any of it a "distractor" would be
+inventing intent that isn't there.
+
+**Why:** verified against real data, not just written to satisfy the
+schema — `tests/fixtures/rcaeval_sample/` is an actual trimmed slice of
+the downloaded bundle (real values, real log lines, not synthesized),
+and `tests/unit/test_rcaeval_import.py` runs the parser against it. The
+full untrimmed case (1,441 rows of `metrics.csv`, ~171k rows of
+`logs.csv`) was also run through `build_incident_draft()` directly (not
+just the trimmed fixture) to confirm real-world performance and that the
+real `checkoutservice_cpu` spike survives the import unchanged — both
+checked, not assumed. One disclosed, not silently worked around, gap:
+`evaluation/ground_truth.py`'s `_ROOT_CAUSE_TO_HYPOTHESIS` only maps the
+two synthetic scenarios' root-cause strings to a canonical hypothesis —
+an imported incident's root cause (e.g. `cpu_stress`) isn't in that
+mapping, so it can be investigated end-to-end but not auto-scored by the
+existing benchmark runner until that mapping is extended. The import
+CLI prints this plainly after every run rather than failing silently or
+claiming full parity with a synthetic scenario.

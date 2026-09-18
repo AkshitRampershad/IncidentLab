@@ -21,15 +21,15 @@ async def _next_incident_id(session) -> str:
     return f"INC-{count + 1:04d}"
 
 
-async def run_scenario(scenario_id: str, anchor_time: datetime | None = None) -> str:
-    """Generate, persist, and return the incident_id for one scenario run.
+async def persist_incident_draft(draft: IncidentDraft) -> str:
+    """Persist an already-built `IncidentDraft` and return its incident_id.
 
+    Shared by `run_scenario` (synthetic `FailureInjector` output) and
+    `simulator.rcaeval_import` (real telemetry parsed from an RCAEval
+    case) — everything past this point treats the two sources identically.
     Ground truth is written to its own table — nothing here ever writes it
     onto the investigator-visible `incidents` row.
     """
-    injector = get_injector(scenario_id)
-    draft: IncidentDraft = injector.generate(anchor_time or datetime.now(UTC))
-
     await create_all_tables()
 
     session_factory = get_session_factory()
@@ -96,6 +96,13 @@ async def run_scenario(scenario_id: str, anchor_time: datetime | None = None) ->
         )
 
     return incident_id
+
+
+async def run_scenario(scenario_id: str, anchor_time: datetime | None = None) -> str:
+    """Generate, persist, and return the incident_id for one scenario run."""
+    injector = get_injector(scenario_id)
+    draft: IncidentDraft = injector.generate(anchor_time or datetime.now(UTC))
+    return await persist_incident_draft(draft)
 
 
 def main() -> None:
