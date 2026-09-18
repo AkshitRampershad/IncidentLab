@@ -19,37 +19,6 @@ want a persistent instance, run it yourself: `docker compose up --build`,
 then open http://localhost:3000 — see [Quick Start](#quick-start) below
 (under one minute if your machine already has Docker).
 
-## Project Status
-
-**All 10 phases of the original build specification are implemented and
-merged to `main`.** That is a statement about scope completion, not
-about every known limitation being resolved — this project has
-consistently disclosed its own gaps rather than hide them:
-
-- No authentication or rate limiting on the API (open by design at this
-  stage — see `docs/deployment.md`).
-- No TLS built in; a reverse proxy is left to the deployer.
-- The evaluation dataset is small (6 incidents across 2 scenarios) and
-  that's stated plainly, not implied to be larger.
-- No live LLM has been exercised end-to-end in this project's own build
-  environment — the fully deterministic path (see "Security Model"
-  below) is what's actually been verified there.
-- **A version tag exists locally but has not been pushed to GitHub, and
-  no GitHub Release has been published.** There is no `v0.1.0` tag and
-  no Release on this repository's GitHub page as of this writing —
-  `git tag`/`git log` locally do not reflect what's publicly visible on
-  GitHub, and this README does not claim otherwise.
-- **Deployed to Render** via the `render.yaml` Blueprint on the free
-  tier — see [Live Demo](#live-demo) above and
-  [Deployment](#deployment) below for the free-tier caveats (spin-down,
-  Postgres expiry).
-
-The full, itemized status — what shipped in each phase, what was
-verified how, and every known limitation — is
-`docs/IMPLEMENTATION_STATUS.md`. `docs/design-decisions.md` records the
-reasoning behind non-obvious choices as they were made, not
-reconstructed after the fact.
-
 ## What is IncidentLab?
 
 IncidentLab investigates software-production incidents using multiple
