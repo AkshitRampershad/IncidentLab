@@ -95,3 +95,17 @@ async def test_get_incident_timeline_merges_sources_in_chronological_order(incid
     source_types = {e.source_type for e in timeline}
     assert source_types == {SourceType.LOG, SourceType.METRIC, SourceType.DEPLOYMENT}
     assert timeline == sorted(timeline, key=lambda e: e.timestamp)
+
+
+async def test_detect_anomaly_supports_less_than_comparison():
+    """cache_hit_rate anomaly is a "<" threshold — only tools/metrics.py's
+    db_connection_pool-scenario metrics exercise ">"/">=" elsewhere; this
+    is the one that needs "<" (a collapsed cache is a *low* value)."""
+    redis_incident_id = await run_scenario("redis_unavailable", anchor_time=ANCHOR)
+
+    anomalies = await detect_anomaly(redis_incident_id, "cache_hit_rate")
+    assert len(anomalies) == 1
+    assert anomalies[0].content == "cache_hit_rate=0.05"
+
+    all_points = await query_metrics(redis_incident_id, "cache_hit_rate")
+    assert len(all_points) == 2  # the healthy baseline point must NOT be flagged

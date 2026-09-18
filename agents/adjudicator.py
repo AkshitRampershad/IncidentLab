@@ -32,19 +32,20 @@ class AdjudicationResult(BaseModel):
     needs_human_review: bool
 
 
-def _corroborating_knowledge(
-    description: str, knowledge_finding: InvestigatorFinding
-) -> list[Evidence]:
-    """Which knowledge-base evidence textually relates to the winning
-    hypothesis. Deliberately simple (shared-keyword overlap, words > 4
-    chars) and only ever applied to the single already-selected
-    hypothesis — Knowledge doesn't compete to pick among hypotheses, it
-    corroborates the one that won (see agents/knowledge.py)."""
+def corroborating_knowledge(description: str, knowledge_evidence: list[Evidence]) -> list[Evidence]:
+    """Which knowledge-base evidence textually relates to a hypothesis.
+    Deliberately simple (shared-keyword overlap, words > 4 chars).
+    Public — also used by evaluation/baselines.py's single-agent baseline,
+    which needs the same "does a runbook back this up" logic without a
+    Hypothesis Manager around it."""
     keywords = {w for w in description.lower().split() if len(w) > 4}
-    return [e for e in knowledge_finding.evidence if any(k in e.content.lower() for k in keywords)]
+    return [e for e in knowledge_evidence if any(k in e.content.lower() for k in keywords)]
 
 
-def _recommend_action(evidence: list[Evidence]) -> str:
+def recommend_action(evidence: list[Evidence]) -> str:
+    """Cites the first matching runbook in `evidence`, if any — never a
+    fabricated remediation step (spec §4.3). Public for the same reason
+    as corroborating_knowledge above."""
     for e in evidence:
         if e.source_type == SourceType.RUNBOOK:
             return f"See runbook '{e.source}' for remediation steps."
@@ -71,7 +72,7 @@ async def adjudicate(
         )
 
     best = hypotheses[0]
-    knowledge_corroboration = _corroborating_knowledge(best.description, knowledge_finding)
+    knowledge_corroboration = corroborating_knowledge(best.description, knowledge_finding.evidence)
     supporting_evidence = best.supporting_evidence + knowledge_corroboration
 
     fallback = (
@@ -108,6 +109,6 @@ async def adjudicate(
         reasoning_summary=reasoning_summary,
         supporting_evidence=supporting_evidence,
         contradicting_evidence=best.contradicting_evidence,
-        recommended_action=_recommend_action(supporting_evidence),
+        recommended_action=recommend_action(supporting_evidence),
         needs_human_review=needs_human_review(best.confidence),
     )

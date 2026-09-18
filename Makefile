@@ -31,8 +31,7 @@ investigate: ## Run a full investigation: make investigate INCIDENT=INC-0001
 	@test -n "$(INCIDENT)" || (echo "Usage: make investigate INCIDENT=<id> (e.g. INC-0001)"; exit 1)
 	uv run python -m orchestration.graph --incident $(INCIDENT)
 
-evaluate: ## Phase 6 (Evaluation) - not implemented yet.
-	@echo "make evaluate is implemented in Phase 6 (Evaluation)."
+evaluate: benchmark ## Alias for `make benchmark` — spec lists both, this project has one evaluation runner.
 
-benchmark: ## Phase 6 (Evaluation) - not implemented yet.
-	@echo "make benchmark is implemented in Phase 6 (Evaluation)."
+benchmark: ## Run the evaluation benchmark (direct-LLM vs single-agent vs multi-agent).
+	uv run python -m evaluation.reports

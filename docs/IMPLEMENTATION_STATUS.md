@@ -5,7 +5,7 @@
 - [x] Phase 3 — Evidence Layer
 - [x] Phase 4 — Agents
 - [x] Phase 5 — Orchestration
-- [ ] Phase 6 — Evaluation
+- [x] Phase 6 — Evaluation
 - [ ] Phase 7 — UI
 - [ ] Phase 8 — Security + Observability
 - [ ] Phase 9 — Deployment
@@ -532,3 +532,126 @@ python -m orchestration.graph --incident INC-9999
   Phase 7's UI layer built on top of this.
 
 **Next phase:** Phase 6 — Evaluation.
+
+---
+
+## Phase 6 — Evaluation
+
+**Implemented:**
+- Second scenario, `simulator/failure_injector/redis_unavailable.py`
+  (spec §23 Scenario 2), added *before* the evaluation harness itself —
+  see DDR-016 for why a benchmark needs more than one possible answer to
+  mean anything. New `cache_hit_rate` metric with a `<` anomaly threshold
+  (`tools/metrics.py` now supports `>`, `>=`, `<`, `<=`). New runbook
+  `knowledge/runbooks/redis-unavailable.md`. Extended
+  `hypotheses/manager.py`'s canonical-grouping table to merge
+  `cache_hit_rate anomaly` into the Redis hypothesis.
+- `agents/adjudicator.py`: `_corroborating_knowledge`/`_recommend_action`
+  made public (`corroborating_knowledge`/`recommend_action`) and
+  `corroborating_knowledge`'s signature simplified to take
+  `list[Evidence]` directly — both now reused by the single-agent
+  baseline instead of being duplicated.
+- `evaluation/ground_truth.py` — the only module (besides the simulator)
+  allowed to read ground truth or `is_distractor` directly; holds the
+  root_cause → correct-hypothesis-text mapping.
+- `evaluation/baselines.py` — spec §27's Direct LLM (Baseline A,
+  confidence structurally fixed at 0.0 — DDR-018) and Single Agent
+  (Baseline B, reuses real tools/patterns but no Hypothesis Manager
+  sophistication) architectures. Multi-Agent reuses
+  `orchestration.graph.investigate` directly — no separate function
+  needed.
+- `evaluation/metrics.py` — spec §27's metrics as pure functions over a
+  `Trial` (result + matching ground truth): root cause accuracy, evidence
+  recall/precision, unsupported-claim rate, false-confidence rate, human
+  escalation rate, latency; `aggregate()` averages a list into one row.
+- `evaluation/datasets.py` — generates the dataset fresh each run (2
+  scenarios × 3 instances by default) rather than static fixtures —
+  DDR-017 on why this is honestly small, not padded to look like spec
+  §28's "50 incidents".
+- `evaluation/runner.py` / `evaluation/reports.py` — runs all three
+  architectures against the same dataset, scores each, renders spec
+  §29's table format; `make benchmark` (and `make evaluate`, an alias)
+  now work.
+- `docs/architecture.md` (Phase 6 slice) and `docs/design-decisions.md`
+  (DDR-016, DDR-017, DDR-018).
+
+**Files changed:** `simulator/failure_injector/redis_unavailable.py`
+(new), `knowledge/runbooks/redis-unavailable.md` (new), `evaluation/`
+(new package), `tools/metrics.py`, `hypotheses/manager.py`,
+`agents/adjudicator.py`, `simulator/scenarios/__init__.py`, `Makefile`,
+plus new/updated tests (see below), `docs/architecture.md`,
+`docs/design-decisions.md`.
+
+**Tests added:**
+- Unit: `test_redis_unavailable_scenario.py` (deterministic, correct
+  ground truth, no accidental DB-pool keyword collisions, error_rate
+  stays low, cache_hit_rate collapses); `test_evaluation_metrics.py`
+  (every metric function against fabricated `Trial`s, including
+  aggregation and the empty-dataset edge case).
+- Integration (real Postgres): `test_orchestration.py` gained a test
+  proving the Redis scenario selects the *different*, correct hypothesis
+  and that the Contradiction Detector actually fires and penalizes the
+  false "connectivity issue" candidate; `test_tools.py` gained a direct
+  test of the new `<` comparison; `test_evaluation.py` — ground truth
+  lookup excludes distractor evidence and includes real evidence; Direct
+  LLM without an LLM is honestly insufficient; Single Agent picks a
+  hypothesis with zero contradiction detection by construction;
+  `generate_dataset` produces distinct incidents across both scenarios;
+  a full `run_benchmark()` end to end, asserting Direct LLM's 0%
+  accuracy/100% escalation and Multi-Agent's 100% accuracy are the real,
+  computed numbers, not placeholders.
+
+**Commands actually run in this session, with real output:**
+```
+uv run pytest -v            # 111 passed (15 new for Phase 6), against
+                             # the same real local Postgres as Phases 2-5
+uv run ruff check .         # All checks passed!
+uv run ruff format --check . # 90 files already formatted
+make benchmark               # ran for real — see actual results below
+uv run python -m evaluation.reports --instances-per-scenario 1 --llm
+                              # confirmed the --llm path works too (tries
+                              # Ollama, fails fast, same results, just
+                              # higher latency numbers)
+```
+
+**Real `make benchmark` output** (6 incidents, no LLM — none reachable in
+this sandbox, same as every prior phase):
+```
+RCA Accuracy         Direct LLM 0%    Single Agent 100%   Multi-Agent 100%
+Evidence Recall       Direct LLM 0%    Single Agent 72%    Multi-Agent 78%
+Evidence Precision    Direct LLM 0%    Single Agent 82%    Multi-Agent 81%
+Unsupported Claims    Direct LLM 0%    Single Agent 0%     Multi-Agent 0%
+False Confidence      Direct LLM 0%    Single Agent 0%     Multi-Agent 0%
+Human Escalation      Direct LLM 100%  Single Agent 0%     Multi-Agent 0%
+Avg Latency           Direct LLM 0.00s Single Agent 0.02s  Multi-Agent 0.05s
+```
+This is a genuine, non-rigged result, not an assumed conclusion (spec §3
+explicitly warns against assuming the answer): for this small dataset,
+Single Agent ties Multi-Agent on raw accuracy, but Multi-Agent shows
+higher evidence recall at a small precision and latency cost — a real,
+disclosed trade-off, not "multi-agent wins everything."
+
+**Known limitations:**
+- The dataset is small (6 incidents, 2 scenarios) and honestly disclosed
+  as such (DDR-017) — not spec §28's 50-100+, and same-scenario repeats
+  are structurally identical except timestamps, not spec §29's "5
+  variations" varying services/distractors/severity/volume.
+- No LLM was exercised end-to-end for real (same as every prior phase) —
+  Direct LLM's 0% accuracy is a genuine finding about this sandbox
+  lacking a reachable model, not a demonstration of the baseline's
+  ceiling with one configured.
+- `tool_calls`/`agent_calls`/`model_tokens` columns from spec §27 aren't
+  reported — no call-count instrumentation exists yet (that's closer to
+  Phase 8's observability work), and fabricating token counts with no
+  live LLM would violate "never fabricate metrics" (spec §29).
+- Single Agent's confidence formula is deliberately cruder than
+  `hypotheses/scoring.py`'s (a single ratio, no diversity/temporal/
+  contradiction terms) — that's the point of the comparison, not an
+  oversight, but it means its confidence numbers aren't directly
+  comparable to Multi-Agent's in an absolute sense, only in relative
+  gating behavior (needs_human_review).
+- No CI job runs `make benchmark` — it's exercised by
+  `tests/integration/test_evaluation.py`'s `run_benchmark()` call, but
+  the formatted-report CLI path itself isn't covered by automated CI.
+
+**Next phase:** Phase 7 — UI.

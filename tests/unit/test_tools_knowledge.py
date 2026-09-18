@@ -4,14 +4,14 @@ from tools.knowledge import get_runbook, search_historical_incidents, search_kno
 
 async def test_search_knowledge_with_no_query_returns_every_doc():
     results = await search_knowledge("INC-0001")
-    assert len(results) == 2
+    assert len(results) == 3  # 2 runbooks + 1 architecture doc
     assert {e.source_type for e in results} == {SourceType.RUNBOOK, SourceType.DOCUMENTATION}
 
 
 async def test_search_knowledge_query_filters_to_matching_docs():
     redis_results = await search_knowledge("INC-0001", query="Redis")
-    assert len(redis_results) == 1
-    assert redis_results[0].source_type == SourceType.DOCUMENTATION
+    assert len(redis_results) == 2  # the redis runbook + the architecture doc
+    assert {e.source_type for e in redis_results} == {SourceType.RUNBOOK, SourceType.DOCUMENTATION}
 
     no_match = await search_knowledge("INC-0001", query="does-not-exist-anywhere")
     assert no_match == []

@@ -306,5 +306,92 @@ Attaching it only to the winner keeps hypothesis *scoring* clean
 (driven only by evidence that actually differentiates candidates) while
 still surfacing genuinely relevant runbooks/historical incidents in the
 final adjudicated result — which is also where `agents/adjudicator.py`'s
-`_recommend_action()` looks for a matching runbook to cite, rather than
-inventing a remediation step (spec §4.3).
+`recommend_action()` looks for a matching runbook to cite, rather than
+inventing a remediation step (spec §4.3). (Both `corroborating_knowledge`
+and `recommend_action` are public — Phase 6's single-agent baseline reuses
+them, see `docs/architecture.md`'s Phase 6 section.)
+
+## DDR-016: a second scenario (`redis_unavailable`) before evaluation, not after
+
+**Context:** Phase 2 shipped with exactly one scenario
+(`db_connection_pool`). Phase 6's whole job is comparing architectures'
+accuracy — but accuracy against a single possible answer is nearly
+meaningless (every architecture either gets 100% or 0%, and there's
+nothing to confuse a system that always guesses the same thing).
+
+**Decision:** before building the evaluation harness, added
+`simulator/failure_injector/redis_unavailable.py` (spec §23 Scenario 2):
+Redis becomes unreachable, latency degrades but — per
+`knowledge/architecture/checkout-service.md`'s own documented
+fallback-to-Postgres behavior — error rate does *not* spike. Deliberately
+built to never say "pool exhausted" or "connection timeout" anywhere, so
+it can't accidentally trigger the DB-pool pattern by keyword collision.
+
+**Why:** this turned out to genuinely exercise the Contradiction Detector,
+not just the happy path: `latency_p99_ms` crosses its threshold in this
+scenario too (elevated latency is real), which pulls a competing
+"Database or downstream connectivity issue" hypothesis into contention
+via the same canonical-grouping table (DDR-013) — but the confirmed-normal
+`error_rate` reading contradicts it, and the detector correctly penalizes
+it (confidence 0.93 → 0.17 in practice, verified in
+`tests/integration/test_orchestration.py`). A benchmark that can't
+possibly be wrong about which scenario it's in isn't really measuring
+anything. Also added a matching runbook
+(`knowledge/runbooks/redis-unavailable.md`) so the Knowledge agent and
+Adjudicator have something real to find here too, not a second-class
+scenario with a first scenario's polish.
+
+## DDR-017: the evaluation dataset is small and honestly disclosed, not padded to look like spec §28-29's "50 incidents"
+
+**Context:** spec §28 aims for 50-100+ incidents (10 scenarios × 5
+variations, later expanded). This project has 2 scenarios, and each
+failure injector is a pure function of `anchor_time` alone — running the
+same scenario at a different anchor_time produces a distinct incident_id
+and absolute timestamps, but *identical* relative structure and content
+(same log messages, same relative offsets, same evidence counts).
+
+**Decision:** `evaluation/datasets.py`'s `generate_dataset()` runs each of
+the 2 registered scenarios 3 times (6 incidents total, configurable via
+`--instances-per-scenario`), generated fresh on every `make benchmark`
+run rather than stored as static fixtures. Docs (this one, README,
+`docs/IMPLEMENTATION_STATUS.md`) say plainly that same-scenario repeats
+are structurally identical except wall-clock time — not spec §29's "5
+variations" varying services/distractors/severity/volume.
+
+**Why:** claiming real diversity that doesn't exist would be exactly the
+kind of fabrication the spec repeatedly warns against (§4.3, §29's own
+"never fabricate metrics") — a dataset row that's byte-for-byte the same
+scenario just relabeled isn't a genuine additional sample, and pretending
+otherwise would make the benchmark's percentages look more statistically
+meaningful than they are. Six honestly-described incidents across two
+real, distinguishable root causes is a legitimate small benchmark;
+padding to a fake "50" would not be. Generating on demand (not static
+fixtures) also means the dataset can never drift out of sync with the
+scenarios that define it. Growing this — both more scenarios and real
+per-scenario parameter variation (error counts, timing offsets, severity)
+— is future work, not attempted here for the sake of a bigger number.
+
+## DDR-018: Direct LLM's confidence is structurally fixed at 0.0, never the LLM's own guess
+
+**Context:** spec §27 Baseline A calls for an LLM given only the
+incident's summary, no tools. With zero evidence, there is nothing
+deterministic to score a confidence against — but spec §16 is explicit
+that an LLM must never assign its own confidence.
+
+**Decision:** `evaluation/baselines.py`'s `direct_llm_investigate()`
+always returns `confidence=0.0`, regardless of whether the LLM answered,
+timed out, or wasn't configured. This structurally forces
+`needs_human_review=True` in every case.
+
+**Why:** the alternative — asking the LLM to also state a confidence
+number — would be exactly the "arbitrarily decides" failure mode spec
+§16 rules out, and a fabricated-looking non-zero number here would
+misrepresent what this baseline actually is: a guess with no evidence
+behind it. Forcing escalation in every case is the honest behavior for
+that situation (spec §4.4: "I don't have enough evidence" is a valid,
+expected outcome, not an error) — and it's also the real, disclosed
+reason this baseline scores 0% accuracy in this sandbox: no LLM is
+reachable here at all (confirmed by trying, same as Phases 4-5), so
+`selected_hypothesis` is always `None`. That's a genuine finding about
+what a tool-free approach can do without a working model, not an
+artifact of how the harness is wired.

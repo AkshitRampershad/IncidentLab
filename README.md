@@ -2,14 +2,13 @@
 
 Open-source multi-agent incident investigation & evaluation lab.
 
-> **Status: Phase 5 of 10 (Orchestration).** `make investigate
-> INCIDENT=<id>` runs a full investigation end to end — five agents in
-> parallel, hypothesis correlation, contradiction detection, confidence
-> gating, an adjudicated result. The evaluation harness, baselines, and
-> web UI described below don't exist yet. See
-> `docs/IMPLEMENTATION_STATUS.md` for what's actually implemented today,
-> and don't take the rest of this README as a description of current
-> capability.
+> **Status: Phase 6 of 10 (Evaluation).** `make benchmark` compares three
+> architectures — direct-LLM, single-agent, and the real multi-agent
+> system — against a small, honestly-disclosed dataset (2 scenarios, 6
+> incidents). The web UI, security hardening, and deployment tooling
+> described below don't exist yet. See `docs/IMPLEMENTATION_STATUS.md`
+> for what's actually implemented today, and don't take the rest of this
+> README as a description of current capability.
 
 ## What is IncidentLab?
 
@@ -93,12 +92,35 @@ summaries and falls back to fully deterministic ones if none is running
 (`--no-llm` skips the attempt). See `docs/architecture.md`'s Phase 5
 section for how the pieces fit together.
 
+## Running the benchmark
+
+```bash
+make benchmark
+```
+
+Runs Direct LLM (spec's Baseline A — no tools, no evidence), Single Agent
+(Baseline B — every tool, no hypothesis correlation), and the real
+Multi-Agent system against the same dataset, and scores each against
+ground truth the architectures never see. Deterministic and fast by
+default (`--llm` attempts a real model for nicer summaries — the results
+don't change, since only free-text narration depends on it).
+
+**The dataset is small and that's disclosed, not hidden:** 2 scenarios ×
+3 instances = 6 incidents by default
+(`--instances-per-scenario` to change it). Repeats of the same scenario
+are structurally identical except timestamps — real per-scenario
+variation (severity, distractor mix, evidence volume) is future work, not
+claimed here. See `docs/design-decisions.md` DDR-017 for the reasoning,
+and `docs/architecture.md`'s Phase 6 section for a real result from this
+dataset (short version: on 6 incidents, Single Agent ties Multi-Agent on
+accuracy but Multi-Agent shows better evidence recall — a genuine,
+non-rigged finding, not an assumed conclusion).
+
 ## Roadmap
 
-Agent architecture detail, evaluation, benchmark results, security, and
-limitations sections will be filled in as each
-phase (see `docs/IMPLEMENTATION_STATUS.md`) actually ships — not written
-speculatively ahead of the code.
+Security, observability, and deployment sections will be filled in as
+each phase (see `docs/IMPLEMENTATION_STATUS.md`) actually ships — not
+written speculatively ahead of the code.
 
 ## License
 

@@ -278,3 +278,74 @@ recommended action — all without any LLM actually running, since none is
 reachable in this sandbox (confirmed: Ollama connection attempts fail
 fast and every agent degrades to its deterministic fallback, ~2 seconds
 end to end for the whole graph).
+
+A second scenario, `simulator/failure_injector/redis_unavailable.py`
+(spec §23 Scenario 2), was added before Phase 6 specifically so there'd
+be two distinguishable root causes to evaluate against — see DDR-016. It
+reuses every piece of this architecture unchanged (same tools, same
+agents, same Hypothesis Manager, same Adjudicator) and genuinely
+exercises the Contradiction Detector: its elevated latency alone would
+suggest "connectivity issue" via the same canonical grouping as the DB
+scenario, but the confirmed-normal `error_rate` reading contradicts it,
+correctly dropping that hypothesis's confidence from 0.93 to 0.17.
+
+## Phase 6: Evaluation
+
+```mermaid
+flowchart LR
+    ds[evaluation/datasets.py] -->|"N incidents x 2 scenarios"| runner[evaluation/runner.py]
+    runner --> direct[baselines.direct_llm_investigate]
+    runner --> single[baselines.single_agent_investigate]
+    runner --> multi["orchestration.graph.investigate<br/>(the real system)"]
+    direct --> score[metrics.py<br/>scored against ground_truth.py]
+    single --> score
+    multi --> score
+    score --> report[reports.format_report]
+```
+
+- **`evaluation/ground_truth.py`** — the *only* module (besides the
+  simulator itself) allowed to read `IncidentGroundTruthRecord` or the
+  `is_distractor` flag. Holds `_ROOT_CAUSE_TO_HYPOTHESIS`, the one place
+  ground truth's enum values and the investigator's free-text hypothesis
+  vocabulary are allowed to touch (spec §8, §18).
+- **`evaluation/baselines.py`** — spec §27's two non-multi-agent
+  architectures:
+  - `direct_llm_investigate` — the incident's public summary straight to
+    an LLM, zero tools, zero evidence. Confidence is structurally fixed
+    at `0.0` regardless of what the LLM says (DDR-018) — never the LLM's
+    own guess, and it forces `needs_human_review: True` every time, which
+    is the honest behavior for a genuinely evidence-free guess.
+  - `single_agent_investigate` — one agent, every tool, reusing the real
+    agents' keyword patterns and anomaly thresholds (so it isn't a
+    strawman with worse *data*) but with none of the Hypothesis Manager's
+    sophistication: no cross-source merging, no contradiction detection,
+    confidence is a single crude ratio. This is deliberately what
+    "multi-agent" is measured against.
+  - `multi_agent` isn't a separate function — the benchmark calls
+    `orchestration.graph.investigate` directly, the exact same code path
+    `make investigate` uses.
+- **`evaluation/metrics.py`** — spec §27's metrics as pure functions over
+  a `Trial` (one architecture's result + the matching ground truth):
+  root cause accuracy, evidence recall/precision (against the incident's
+  real non-distractor evidence_ids), unsupported-claim rate, false-
+  confidence rate, human escalation rate, latency. `aggregate()` averages
+  a list of `Trial`s into one architecture's row.
+- **`evaluation/datasets.py`** — generates the benchmark dataset fresh
+  each run (DDR-017: 2 scenarios × 3 instances by default, honestly
+  disclosed as structurally-repeated instances, not spec §29's "5
+  variations").
+- **`evaluation/runner.py`** — runs all three architectures against the
+  same dataset, scores each, returns a `BenchmarkReport`.
+- **`evaluation/reports.py`** — spec §29's table format (one table per
+  metric, architectures as rows) plus the `make benchmark` CLI.
+
+Verified with `make benchmark` (6 incidents, no LLM — this sandbox has
+none): Direct LLM scores 0% on everything and 100% human escalation, the
+real and disclosed consequence of having no evidence and no reachable
+model, not a harness bug. Single Agent and Multi-Agent both reach 100%
+root cause accuracy on this small dataset, but Multi-Agent shows higher
+evidence recall (78% vs 72% — the cross-source evidence merging helps)
+at a small precision cost (81% vs 82%) and higher latency (0.05s vs
+0.02s, pure orchestration overhead with no LLM in the loop) — a genuine,
+non-rigged finding for this dataset size, not an assumed conclusion (spec
+§3: "do not assume the answer").

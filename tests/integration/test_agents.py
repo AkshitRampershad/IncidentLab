@@ -70,7 +70,7 @@ async def test_knowledge_agent(incident_id):
     finding = await knowledge.investigate(incident_id)
 
     assert finding.agent_name == "knowledge"
-    assert len(finding.evidence) == 3  # 1 runbook + 1 architecture doc + 1 historical incident
+    assert len(finding.evidence) == 4  # 2 runbooks + 1 architecture doc + 1 historical incident
     assert finding.hypotheses_supported == []
 
 

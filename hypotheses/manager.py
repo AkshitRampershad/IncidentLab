@@ -24,6 +24,7 @@ _CANONICAL_HYPOTHESES: dict[str, list[str]] = {
     ],
     "Cache layer (Redis) involvement": [
         "Cache layer (Redis) involvement",
+        "cache_hit_rate anomaly",
     ],
 }
 

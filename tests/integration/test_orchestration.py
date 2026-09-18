@@ -42,3 +42,25 @@ async def test_investigation_evidence_never_carries_is_distractor(incident_id):
     state = await investigate(incident_id, llm=None)
     for e in state["adjudication"].supporting_evidence:
         assert not hasattr(e, "is_distractor")
+
+
+async def test_second_scenario_selects_a_different_hypothesis():
+    """The system must be able to tell two different root causes apart,
+    not always land on whatever the one well-tested scenario favors. Also
+    exercises the contradiction detector for real: this scenario's
+    elevated latency alone would suggest "connectivity issue", but the
+    confirmed-normal error_rate reading contradicts it — the detector
+    must penalize that hypothesis below the correct Redis one."""
+    incident_id = await run_scenario("redis_unavailable", anchor_time=ANCHOR)
+    state = await investigate(incident_id, llm=None)
+
+    adjudication = state["adjudication"]
+    assert adjudication.selected_hypothesis == "Cache layer (Redis) involvement"
+    assert adjudication.confidence > 0.9
+    assert adjudication.needs_human_review is False
+
+    by_description = {h.description: h for h in state["hypotheses"]}
+    connectivity = by_description.get("Database or downstream connectivity issue")
+    if connectivity is not None:
+        assert connectivity.contradicting_evidence != []
+        assert connectivity.confidence < adjudication.confidence

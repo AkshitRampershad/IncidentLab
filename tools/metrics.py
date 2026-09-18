@@ -1,3 +1,5 @@
+from collections.abc import Callable
+
 from sqlalchemy import select
 
 from core.db import get_session_factory
@@ -19,6 +21,14 @@ _ANOMALY_THRESHOLDS: dict[str, tuple[str, float]] = {
     "latency_p99_ms": (">", 500),
     "cpu_usage_percent": (">", 90),
     "db_connections_active": (">=", 5),
+    "cache_hit_rate": ("<", 0.3),
+}
+
+_COMPARISONS: dict[str, Callable[[float, float], bool]] = {
+    ">": lambda value, threshold: value > threshold,
+    ">=": lambda value, threshold: value >= threshold,
+    "<": lambda value, threshold: value < threshold,
+    "<=": lambda value, threshold: value <= threshold,
 }
 
 
@@ -81,9 +91,7 @@ async def detect_anomaly(incident_id: str, metric_name: str) -> list[Evidence]:
             f"Known metrics: {', '.join(sorted(_ANOMALY_THRESHOLDS))}"
         )
     comparison, threshold = _ANOMALY_THRESHOLDS[metric_name]
+    is_anomalous = _COMPARISONS[comparison]
     points = await query_metrics(incident_id, metric_name)
 
-    def is_anomalous(value: float) -> bool:
-        return value > threshold if comparison == ">" else value >= threshold
-
-    return [e for e in points if is_anomalous(float(e.content.split("=")[1]))]
+    return [e for e in points if is_anomalous(float(e.content.split("=")[1]), threshold)]
