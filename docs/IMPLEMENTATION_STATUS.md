@@ -6,7 +6,7 @@
 - [x] Phase 4 — Agents
 - [x] Phase 5 — Orchestration
 - [x] Phase 6 — Evaluation
-- [ ] Phase 7 — UI
+- [x] Phase 7 — UI
 - [ ] Phase 8 — Security + Observability
 - [ ] Phase 9 — Deployment
 - [ ] Phase 10 — Open Source Release
@@ -655,3 +655,117 @@ disclosed trade-off, not "multi-agent wins everything."
   the formatted-report CLI path itself isn't covered by automated CI.
 
 **Next phase:** Phase 7 — UI.
+
+---
+
+## Phase 7 — UI
+
+**Implemented:**
+- `apps/api/routes/incidents.py`, `investigations.py`, `evaluations.py` —
+  spec §38's endpoint surface (`GET/POST /incidents`, `GET
+  /incidents/{id}`, `POST /incidents/{id}/investigate`, `GET
+  /investigations/{id}` + `/timeline` + `/evidence` + `/hypotheses` +
+  `/agents`, `POST .../approve` + `.../reject`, `GET /evaluations`,
+  `POST /evaluations/run`, `GET /evaluations/{id}`), plus `GET
+  /scenarios` (not in spec's list; the UI needs it). None of this is
+  persisted beyond what already existed — see DDR-019 (investigations
+  recompute fresh, they're not cached/stored), DDR-020 (evaluations live
+  in an in-memory dict, not Postgres), DDR-021 (approve/reject are
+  acknowledgment-only and say so in the response).
+- `apps/api/main.py`: FastAPI `lifespan` hook creating the schema at
+  startup — fixes a real bug, see "Bugs found" below.
+- `apps/web`: three pages (`/` incident dashboard, `/incidents/[id]`
+  investigation console, `/evaluation` benchmark dashboard), a dark
+  "SRE console" theme (`app/globals.css`), typed API client
+  (`lib/api.ts` + `lib/types.ts`), two small shared components
+  (`SeverityBadge`, `ConfidenceBar`). Evidence is rendered as a grouped,
+  linked list rather than an interactive graph — DDR-022.
+- `apps/api/Dockerfile` updated to copy every package the API now
+  transitively imports (`agents`, `orchestration`, `hypotheses`,
+  `evidence`, `tools`, `simulator`, `evaluation`, `knowledge`) — it only
+  copied `core` and `apps/api` before, which would have broken the
+  containerized image the moment these routes were added.
+
+**Files changed:** `apps/api/routes/incidents.py` (new),
+`investigations.py` (new), `evaluations.py` (new), `apps/api/main.py`,
+`apps/api/Dockerfile`, `agents/adjudicator.py` (precision fix — see
+below), `apps/web/app/page.tsx` (rewritten), `apps/web/app/layout.tsx`,
+`apps/web/app/globals.css` (new), `apps/web/app/incidents/[id]/page.tsx`
+(new), `apps/web/app/evaluation/page.tsx` (new),
+`apps/web/components/SeverityBadge.tsx` (new),
+`apps/web/components/ConfidenceBar.tsx` (new), `apps/web/lib/api.ts`
+(new), `apps/web/lib/types.ts` (new), `apps/web/eslint.config.mjs`
+(exclude generated `next-env.d.ts`), plus new/updated tests (below),
+`docs/architecture.md`, `docs/design-decisions.md`.
+
+**Tests added:**
+- Integration (real Postgres): `test_api_incidents.py`,
+  `test_api_investigations.py`, `test_api_evaluations.py` — every route,
+  including 404s for unknown incidents/evaluations and 400 for an
+  unknown scenario_id. `test_api_lifespan.py` — a dedicated regression
+  test for the schema-creation bug (see below): drops every table, drives
+  the app's actual `lifespan` context manager directly (the one place
+  it's exercised at all — plain `httpx.ASGITransport` doesn't trigger
+  ASGI lifespan events the way a real server does), confirms a query
+  against the now-recreated table succeeds.
+- `tests/unit/test_adjudicator.py` gained a regression test for the
+  keyword-matching precision bug (see below): a doc sharing only one
+  generic word with the hypothesis must not be treated as corroborating.
+
+**Commands actually run in this session, with real output:**
+```
+uv run pytest -v              # 132 passed (17 new for Phase 7)
+uv run ruff check .           # All checks passed!
+uv run ruff format --check .  # 97 files already formatted
+cd apps/web && npm run lint   # clean
+cd apps/web && npm run build  # succeeds, types check
+```
+Then — per the "start the dev server and use the feature in a browser"
+instruction — actually ran both servers (`uvicorn` + `next dev`) and
+drove the whole UI with a real headless browser (Playwright): generated
+an incident, ran an investigation, reviewed the RCA, approved it, ran the
+benchmark. Screens captured at every step. This is what caught both real
+bugs below — neither showed up in `pytest`, `npm run build`, or a code
+read.
+
+**Bugs found by manually testing the UI, fixed same phase:**
+1. `GET /incidents` 500'd (`UndefinedTableError`) against a truly fresh
+   database — only `run_scenario()` ever created the schema, and a
+   read-only route (like the dashboard's own first load) had no write to
+   piggyback that on. Fixed with the `lifespan` hook above. This had
+   **zero test coverage before this phase** — every integration test's
+   `clean_db` fixture calls `create_all_tables()` itself, which silently
+   masked the bug from the entire existing suite regardless of the API
+   code; `test_api_lifespan.py` is the first test that actually exercises
+   the app's own schema-creation path.
+2. `corroborating_knowledge()`'s any-keyword-match rule was pulling the
+   *wrong* runbook (and the architecture doc) into "supporting evidence"
+   for the DB connection-pool hypothesis, purely because they all share
+   the generic word "connection" — obvious the moment it rendered as a
+   wall of irrelevant markdown in the actual UI, far less obvious from
+   unit tests using short fabricated strings. Fixed by requiring at least
+   two matching keywords. See `docs/design-decisions.md`'s closing
+   section for both, in more detail.
+
+**Known limitations:**
+- No Ollama service in `docker-compose.yml` — the UI's "use LLM" toggle
+  now has a genuine caller (unlike when this was deferred in Phase 4),
+  but a multi-GB model pull as the default `docker compose up` experience
+  is still the wrong trade-off; Ollama is meant to be run natively
+  anyway (GPU access). Documented in the README instead of wired in.
+- Approve/Reject and the evaluation store are exactly as limited as
+  DDR-021/DDR-020 say — acknowledgment-only, in-memory, not audited.
+- No loading skeletons/error retry UX beyond a plain error box — this is
+  a working console, not a polished product; revisit if it's ever
+  user-facing beyond local dev.
+- The `/investigations/*` sub-resource endpoints (`/timeline`,
+  `/evidence`, `/hypotheses`, `/agents`) exist for spec §38 completeness
+  but the web UI doesn't call them — it uses the one `POST
+  .../investigate` response for everything, so they're tested at the API
+  level but not exercised by the frontend.
+- No CI job builds or lints the web app on every push — Phase 1's
+  `.github/workflows/ci.yml` has a `web` job (lint + build), so this is
+  covered, but nothing runs the Playwright-driven browser check from
+  this phase in CI; it was a one-time manual verification.
+
+**Next phase:** Phase 8 — Security + Observability.

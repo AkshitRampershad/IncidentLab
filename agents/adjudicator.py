@@ -34,12 +34,27 @@ class AdjudicationResult(BaseModel):
 
 def corroborating_knowledge(description: str, knowledge_evidence: list[Evidence]) -> list[Evidence]:
     """Which knowledge-base evidence textually relates to a hypothesis.
-    Deliberately simple (shared-keyword overlap, words > 4 chars).
-    Public — also used by evaluation/baselines.py's single-agent baseline,
-    which needs the same "does a runbook back this up" logic without a
-    Hypothesis Manager around it."""
-    keywords = {w for w in description.lower().split() if len(w) > 4}
-    return [e for e in knowledge_evidence if any(k in e.content.lower() for k in keywords)]
+
+    Deliberately simple (shared-keyword overlap, words > 4 chars), but
+    requires at least two matching keywords (or all of them, if only one
+    qualifies) rather than any single one — a single shared word like
+    "connection" appears in nearly every DB-adjacent document in this
+    knowledge base and matched everything, burying the genuinely relevant
+    runbook under two irrelevant ones. Public — also used by
+    evaluation/baselines.py's single-agent baseline, which needs the same
+    "does a runbook back this up" logic without a Hypothesis Manager
+    around it.
+    """
+    keywords = {w.strip("().,;:\"'") for w in description.lower().split()}
+    keywords = {w for w in keywords if len(w) > 4}
+    if not keywords:
+        return []
+    required = min(2, len(keywords))
+    return [
+        e
+        for e in knowledge_evidence
+        if sum(1 for k in keywords if k in e.content.lower()) >= required
+    ]
 
 
 def recommend_action(evidence: list[Evidence]) -> str:

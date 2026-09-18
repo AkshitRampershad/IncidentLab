@@ -395,3 +395,126 @@ reachable here at all (confirmed by trying, same as Phases 4-5), so
 `selected_hypothesis` is always `None`. That's a genuine finding about
 what a tool-free approach can do without a working model, not an
 artifact of how the harness is wired.
+
+## DDR-019: `GET /investigations/*` recomputes on every call — nothing is persisted
+
+**Context:** spec §38 lists `GET /investigations/{id}`,
+`/timeline`, `/evidence`, `/hypotheses`, `/agents` as if each reads a
+stored investigation record.
+
+**Decision:** none of these routes read a persisted "investigation" row.
+`apps/api/routes/investigations.py` re-runs
+`orchestration.graph.investigate()` fresh on every call (a shared `_run()`
+helper), and the sub-resource endpoints (`/timeline`, `/evidence`, ...)
+just slice the same fresh result. `POST /incidents/{id}/investigate` and
+`GET /investigations/{id}` are therefore identical in effect — an
+`investigation_id` is just the `incident_id`, because there's only ever
+one deterministic investigation per incident right now.
+
+**Why:** the system has no randomness and no ground-truth dependency in
+its output, and without a live LLM (this sandbox has none) a full
+investigation completes in well under a second — recomputing is simpler
+than a cache or a new `investigations` table, and it can never go stale
+relative to the incident's actual evidence the way a cached row could.
+The web UI calls the POST endpoint exactly once per "Run Investigation"
+click and holds the result in React state, so the sub-resource endpoints
+existing for spec-completeness doesn't mean the UI pays for five
+re-runs per page. Revisit if a future phase adds real per-run variance
+(e.g. actual LLM sampling at nonzero temperature) that would make "the
+investigation" not a pure function of `incident_id` anymore.
+
+## DDR-020: evaluation runs are stored in memory only, not in Postgres
+
+**Context:** spec §38 lists `GET /evaluations` and
+`GET /evaluations/{id}` as if benchmark runs are durably recorded.
+
+**Decision:** `apps/api/routes/evaluations.py` keeps a module-level
+`dict[str, BenchmarkReport]` keyed by a generated UUID. It's gone on
+API restart.
+
+**Why:** this is dev/demo tooling for comparing architectures, not a
+production audit trail — adding a schema (and a migration story, given
+DDR-004 already deferred Alembic) for data nobody has asked to keep past
+one process's lifetime would be speculative infrastructure. The dataset
+itself is also regenerated fresh on every run (DDR-017), so a "past
+evaluation" is already not reproducible byte-for-byte from its ID alone
+in the way a real audit record would need to be. Revisit if evaluation
+history genuinely needs to survive a restart — that's a real, boundable
+feature, not a hard one, when there's an actual need for it.
+
+## DDR-021: Approve/Reject are acknowledgment-only, and say so in the response
+
+**Context:** spec §20 describes Approve / Reject / Request More
+Investigation as real human-in-the-loop actions. Phase 5 (DDR-014)
+already deferred any re-investigation loop; nothing downstream of a
+human decision exists yet.
+
+**Decision:** `POST /investigations/{id}/approve` and `/reject` return a
+`ReviewDecision` whose `note` field states plainly that the action is
+acknowledged only, with no persisted audit trail or re-investigation
+effect — visible in the API response itself, not just in this doc.
+
+**Why:** implementing the buttons with no disclosure of what they
+actually do would look like a working review workflow when it isn't one
+— exactly the "no placeholder functionality... call it complete" trap
+(spec §57). Saying so directly in the response (and the web UI surfacing
+that note after clicking) keeps the honesty at the point someone would
+actually notice, not buried in a doc they may never open.
+
+## DDR-022: the "Evidence Graph" is a grouped, linked list — not an interactive node graph
+
+**Context:** spec §35 describes a clickable node/edge visualization
+(Incident → Deployment → Log → Metric → historical incident).
+`evidence/graph.py` was deferred in Phase 3 (DDR-009) specifically until
+Phase 7 had a real consumer for it.
+
+**Decision:** the investigation view (`apps/incidents/[id]/page.tsx`)
+renders evidence as two grouped, labeled lists — Supporting and
+Contradicting, each item showing its evidence_id/source_type/source/
+relevance and full content (long documents collapse behind a native
+`<details>` toggle) — rather than an interactive graph library
+(react-flow or similar).
+
+**Why:** at this project's evidence volumes (a dozen-ish items per
+investigation), a graph adds a new heavy frontend dependency and
+real interaction-design work for the same information a list already
+conveys — every item already carries its `evidence_id` and
+`provenance`, which is what would back a graph's edges. `evidence/graph.py`
+stays unbuilt for the same reason: nothing consumes a graph-shaped
+payload yet. Revisit once evidence volume or genuinely graph-shaped
+relationships (e.g. multi-hop provenance chains) make a list hard to
+scan — a real UI need, not a mockup to match for its own sake.
+
+## Bug found by manually testing the UI in a browser, fixed same phase
+
+Building the investigation view surfaced two real bugs that no existing
+test caught:
+
+1. **`GET /incidents` 500'd on a truly fresh database.**
+   `simulator.replay.run_scenario()` always called
+   `core.db.create_all_tables()` before its first write, but no read-only
+   route ever did — so the very first request to a freshly-started API
+   against an empty Postgres (e.g. the dashboard's own initial load)
+   threw `UndefinedTableError` instead of returning `[]`. Fixed with a
+   FastAPI `lifespan` hook in `apps/api/main.py` that creates the schema
+   at startup. **This had zero test coverage before this phase** — every
+   integration test's `clean_db` fixture calls `create_all_tables()`
+   itself before each test runs, which silently masked the bug from the
+   entire existing suite; `tests/integration/test_api_lifespan.py` now
+   drops everything and drives the app's actual `lifespan` context
+   manager directly, the one place it's exercised at all (plain
+   `httpx.ASGITransport` doesn't trigger ASGI lifespan events the way a
+   real server does).
+2. **`corroborating_knowledge()`'s any-keyword-matches rule was too
+   loose.** A hypothesis about database connection pool exhaustion was
+   pulling in the *Redis* runbook and the architecture doc as
+   "supporting evidence" purely because they all share the word
+   "connection" — visibly obvious once rendered in the actual UI, far
+   less obvious from unit tests using short fabricated content. Fixed by
+   requiring at least two matching keywords (or all of them, if only one
+   qualifies) — see `agents/adjudicator.py`.
+
+Neither would have been caught by unit or integration tests alone; both
+came directly from following the "start the dev server and use the
+feature in a browser" instruction rather than treating a clean test run
+as sufficient.

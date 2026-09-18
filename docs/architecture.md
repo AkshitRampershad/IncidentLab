@@ -349,3 +349,57 @@ at a small precision cost (81% vs 82%) and higher latency (0.05s vs
 0.02s, pure orchestration overhead with no LLM in the loop) — a genuine,
 non-rigged finding for this dataset size, not an assumed conclusion (spec
 §3: "do not assume the answer").
+
+## Phase 7: UI
+
+```mermaid
+flowchart LR
+    web["apps/web (Next.js)"] -->|fetch, browser-side| api[apps/api routes]
+    api --> incidents_r["incidents.py<br/>list/get/create"]
+    api --> inv_r["investigations.py<br/>investigate/approve/reject"]
+    api --> eval_r["evaluations.py<br/>run/list/get"]
+    inv_r --> graph[orchestration.graph.investigate]
+    eval_r --> runner[evaluation.runner.run_benchmark]
+```
+
+- **`apps/api/routes/incidents.py`** — `GET /incidents`, `GET
+  /incidents/{id}`, `POST /incidents` (runs a scenario — the web UI's
+  "Generate Incident" control), `GET /scenarios` (not in spec §38's
+  literal list; the UI needs it to populate that control).
+- **`apps/api/routes/investigations.py`** — `POST
+  /incidents/{id}/investigate` plus `GET /investigations/{id}` and its
+  `/timeline`, `/evidence`, `/hypotheses`, `/agents` sub-resources, and
+  `POST .../approve` / `.../reject`. None of this is persisted — see
+  DDR-019 (why recomputing is simpler and can't go stale) and DDR-021
+  (why approve/reject say plainly, in the response itself, that they're
+  acknowledgment-only).
+- **`apps/api/routes/evaluations.py`** — `GET /evaluations`, `POST
+  /evaluations/run`, `GET /evaluations/{id}`, backed by an in-memory
+  dict (DDR-020 — not Postgres; this is dev/demo tooling, not an audit
+  trail).
+- **`apps/api/main.py`** gained a `lifespan` hook that creates the schema
+  at startup — fixing a real bug that no route previously guaranteed
+  (`docs/design-decisions.md`'s closing section, "Bug found by manually
+  testing the UI in a browser").
+- **`apps/web`** — three pages, all client components fetching the API
+  directly (`lib/api.ts`, typed against `lib/types.ts`, hand-written to
+  match the Pydantic response models field-for-field):
+  - `/` — incident dashboard: generate an incident from a scenario, list
+    existing ones, link into each.
+  - `/incidents/[id]` — the investigation console: incident header, a
+    "Run Investigation" action (with an optional "use LLM" toggle),
+    then Agent Activity (one card per agent), Hypotheses (confidence
+    bars), and the RCA panel (selected hypothesis, reasoning, supporting/
+    contradicting evidence, recommended action, Approve/Reject). Evidence
+    is a grouped, linked list rather than an interactive graph — DDR-022
+    on why that's a deliberate scope cut, not an oversight.
+  - `/evaluation` — runs the Phase 6 benchmark and renders spec §29's
+    table format in the browser.
+  - Dark, technical styling (`app/globals.css`) — spec §31's own
+    direction ("an SRE investigation console, not a chatbot").
+
+Verified by actually running both dev servers and driving the UI with a
+real headless browser (Playwright), not just `npm run build` — screens
+captured at each step of generate → investigate → review → benchmark.
+That's what caught both bugs `docs/design-decisions.md` closes with;
+neither showed up in `npm run build`, `pytest`, or a code read.

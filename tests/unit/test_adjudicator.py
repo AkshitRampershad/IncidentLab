@@ -89,6 +89,24 @@ async def test_matching_runbook_becomes_the_recommended_action():
     assert runbook in result.supporting_evidence
 
 
+async def test_single_generic_keyword_overlap_is_not_enough_to_corroborate():
+    """Regression test: a doc sharing only one common word ("connection")
+    with the hypothesis text must NOT be pulled in as corroborating
+    evidence — found by actually looking at the rendered UI (a real
+    knowledge base entry unrelated to pool exhaustion, but mentioning
+    "connection", was showing up as "supporting evidence")."""
+    unrelated = _evidence(
+        "RUNBOOK-redis-unavailable",
+        SourceType.RUNBOOK,
+        "Runbook: Redis Unavailable. Log lines like 'redis connection refused'.",
+        source="runbooks/redis-unavailable.md",
+    )
+    hypotheses = [_hypothesis("Connection pool exhaustion", 0.93)]
+    result = await adjudicate(hypotheses, _knowledge_finding([unrelated]))
+
+    assert unrelated not in result.supporting_evidence
+
+
 async def test_no_matching_runbook_falls_back_to_escalation_action():
     hypotheses = [_hypothesis("Connection pool exhaustion", 0.93)]
     result = await adjudicate(hypotheses, _knowledge_finding([]))

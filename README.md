@@ -2,13 +2,14 @@
 
 Open-source multi-agent incident investigation & evaluation lab.
 
-> **Status: Phase 6 of 10 (Evaluation).** `make benchmark` compares three
-> architectures — direct-LLM, single-agent, and the real multi-agent
-> system — against a small, honestly-disclosed dataset (2 scenarios, 6
-> incidents). The web UI, security hardening, and deployment tooling
-> described below don't exist yet. See `docs/IMPLEMENTATION_STATUS.md`
-> for what's actually implemented today, and don't take the rest of this
-> README as a description of current capability.
+> **Status: Phase 7 of 10 (UI).** A web UI (`docker compose up`, then
+> http://localhost:3000) lets you generate an incident, run a full
+> investigation, and review the result without touching the CLI or
+> reading logs — plus a benchmark dashboard. Security hardening,
+> observability, and deployment tooling described below don't exist yet.
+> See `docs/IMPLEMENTATION_STATUS.md` for what's actually implemented
+> today, and don't take the rest of this README as a description of
+> current capability.
 
 ## What is IncidentLab?
 
@@ -52,6 +53,22 @@ docker compose up --build
 - API docs: http://localhost:8000/docs
 
 Ports are configurable in `.env`.
+
+## Using the web UI
+
+Open http://localhost:3000: pick a scenario and click **Generate** to
+create an incident, click **Investigate →** on it, then **Run
+Investigation** to see all five agents, the correlated hypotheses, and
+the final RCA — no CLI, no reading raw logs. **Evaluation** in the nav
+runs the same benchmark as `make benchmark`, rendered as a table.
+
+The "use LLM" toggle on the investigation page tries a real model for
+nicer prose summaries and falls back to fully deterministic ones if none
+is reachable (see `docs/design-decisions.md` DDR-010) — the underlying
+findings, hypotheses, and RCA never depend on it either way. To actually
+exercise it, install [Ollama](https://ollama.com) natively (not
+dockerized — most Ollama setups are native for GPU access) and `ollama
+pull llama3.1` (or set `LLM_MODEL` in `.env` to whatever you pulled).
 
 ## Local (non-Docker) development
 
