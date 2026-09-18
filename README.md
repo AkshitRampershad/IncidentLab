@@ -229,13 +229,6 @@ yet — see Roadmap).
 Full detail and the specific DDRs behind each of these: `docs/design-decisions.md`
 (DDR-023 through DDR-027).
 
-## Screenshots
-
-Not yet included in this repository. Run it locally (see Quick Start
-below) to see the investigation console — agent activity cards,
-hypothesis confidence bars, and the root-cause-analysis panel — and the
-evaluation dashboard described above.
-
 ## Quick Start
 
 ```bash
