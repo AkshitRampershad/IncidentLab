@@ -124,6 +124,10 @@ Code and Knowledge Investigator agents that actually need them, once
 there's real content (a runbook, an architecture doc, a git-backed commit
 history) to search.
 
+**Update (Phase 4):** `tools/knowledge.py` now exists — see DDR-012.
+`tools/github.py` and `tools/traces.py` are still deferred: still no real
+git repository or tracing backend to integrate against.
+
 ## DDR-009: `evidence/graph.py` is deferred to Phase 7
 
 **Context:** the spec's file tree includes `evidence/graph.py` inside the
@@ -140,3 +144,80 @@ everything a graph view would need (evidence_id, source, timestamp,
 provenance); building the graph-shaping code now, before there's a
 consumer or even an agreed node/edge shape for the UI, risks writing it
 twice.
+
+## DDR-010: an agent's structured findings are always deterministic; only its `summary` is LLM-enhanced
+
+**Context:** spec §4.2 assigns "interpretation, summarization, ...
+evidence synthesis" to the LLM. But this sandbox has no LLM access at all
+(no Ollama installed, no reachable API — confirmed by trying), and the
+spec is equally explicit elsewhere that local-first must actually work
+and CI must not require a proprietary key (§6, §47).
+
+**Decision:** each investigator agent (`agents/logs.py`,
+`agents/metrics.py`, `agents/code.py`, `agents/knowledge.py`,
+`agents/triage.py`) computes `findings`, `evidence`, and
+`hypotheses_supported` entirely deterministically, from the Phase 3 tool
+outputs (spike counts, anomaly thresholds, deployment proximity, keyword
+pattern matches). Only the `summary` field is LLM-generated when an
+`LLMProvider` is passed in and reachable; `agents/base.py`'s
+`summarize_or_fallback` degrades to a deterministic fallback (built from
+the same findings, not a blank or an error) on any LLM failure or
+absence — never blocking, never fabricating.
+
+**Why:** Phase 4's definition of done is "each agent independently
+executes tools and produces **structured** findings" — that's the
+deterministic part, and it has to work with zero LLM access to be
+testable and runnable in this environment (and honestly, in most
+contributors' environments without Ollama already pulled). The LLM
+becomes a narration layer on top of an already-complete result, not a
+dependency the core behavior needs. `hypotheses_supported` uses a small
+keyword-pattern table (`agents/base.py`'s `hypotheses_from_content`)
+instead of literally hardcoding the ground-truth taxonomy string
+(`database_connection_pool_exhaustion`) into agent code — that would make
+the agent look like it's investigating while actually just parroting the
+answer, which defeats the entire point of the project once more
+scenarios exist to tell apart.
+
+## DDR-011: the Code Investigator reuses `tools/deployments.py`, not a new git tool
+
+**Context:** spec §13's Code Investigator calls `search_commits()`,
+`get_commit()`, `get_diff()`, `search_files()` — real git operations
+against a real repository. IncidentLab has no such repository to
+investigate; the simulator only ever produces a `commit_sha` *string* and
+a change description on a deployment record.
+
+**Decision:** `agents/code.py` calls `tools.deployments.
+get_recent_deployments()` — the same tool `agents/triage.py` uses —
+rather than a new `tools/github.py`.
+
+**Why:** a deployment record already *is* "a code change, with its commit
+sha and a description of what changed" (spec §13's own worked example —
+"PR #482 changed database connection pool configuration" — is exactly
+this shape). Building `tools/github.py` now would mean either mocking
+git history or integrating against this project's own repo as a stand-in
+for "the production repo," neither of which is real evidence about the
+incident being investigated. Real git integration is future work once
+there's an actual target repository to search.
+
+## DDR-012: the knowledge base is real hand-authored markdown, searched by keyword — no Qdrant/embeddings yet
+
+**Context:** spec §14 describes the Knowledge Investigator using "metadata
+filtering + vector retrieval + reranking" against Qdrant (spec §6). No
+embeddings pipeline, reranker, or vector store exists in this project.
+
+**Decision:** `knowledge/` holds three real, hand-authored markdown
+documents (a runbook, an architecture note, one clearly-labeled synthetic
+historical incident — spec §49's synthetic-data rule). `tools/knowledge.py`
+searches them with the same case-insensitive substring match
+(`evidence.scoring.matches_query`) every other tool already uses, not
+literal vector search.
+
+**Why:** at three documents, a vector store is pure overhead with nothing
+to demonstrate — precision/recall over a 3-document corpus is not a
+meaningful signal either way. Substring search over real content is
+honest about what it is, fully deterministic, needs no embedding model
+(which this sandbox can't run — no Ollama, no reachable embedding API),
+and gives the Knowledge Investigator agent genuine, correctly-provenanced
+evidence today. Revisit once the corpus is large enough that "does the
+right document rank first" is an actual question — Qdrant is already in
+the target stack (spec §6) for exactly that point.

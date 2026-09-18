@@ -2,7 +2,10 @@
 
 Open-source multi-agent incident investigation & evaluation lab.
 
-> **Status: Phase 3 of 10 (Evidence Layer).** The investigation agents and
+> **Status: Phase 4 of 10 (Agents).** Five agents (triage, logs, metrics,
+> code, knowledge) each independently investigate an incident and produce
+> structured findings — but nothing orchestrates them together yet, and
+> the hypothesis manager, contradiction detector, confidence gating, and
 > evaluation harness described below don't exist yet. See
 > `docs/IMPLEMENTATION_STATUS.md` for what's actually implemented today,
 > and don't take the rest of this README as a description of current

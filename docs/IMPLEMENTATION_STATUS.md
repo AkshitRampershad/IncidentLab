@@ -3,7 +3,7 @@
 - [x] Phase 1 — Repository + Infrastructure
 - [x] Phase 2 — Incident Simulator
 - [x] Phase 3 — Evidence Layer
-- [ ] Phase 4 — Agents
+- [x] Phase 4 — Agents
 - [ ] Phase 5 — Orchestration
 - [ ] Phase 6 — Evaluation
 - [ ] Phase 7 — UI
@@ -304,3 +304,116 @@ correctly found the one 12-error-in-one-minute bucket.
   that wiring, and the security hardening from spec §39, are Phase 4/8.
 
 **Next phase:** Phase 4 — Agents.
+
+---
+
+## Phase 4 — Agents
+
+**Implemented:**
+- `core/llm/` — spec §44's `LLMProvider` abstraction: `OllamaProvider`
+  (default), `OpenAICompatibleProvider`, `AnthropicCompatibleProvider`,
+  all raising one `LLMUnavailableError` on any failure, plus
+  `factory.get_llm_provider()` reading `core.config.Settings`. `httpx`
+  moved from a dev-only to a main dependency (now used by production
+  code, not just tests).
+- `agents/base.py` — `hypotheses_from_content` (deterministic keyword →
+  hypothesis-text pattern matching) and `summarize_or_fallback` (LLM
+  narration with a deterministic fallback — see DDR-010 for why an
+  agent's *structured* output never depends on LLM availability).
+- `agents/models.py` — `TriageFinding`, `InvestigatorFinding`.
+- Five agents, each an independently-callable
+  `investigate(incident_id, llm=None)`: `agents/triage.py`,
+  `agents/logs.py`, `agents/metrics.py`, `agents/code.py` (reuses
+  `tools.deployments` — DDR-011), `agents/knowledge.py`.
+- `knowledge/` — three real, hand-authored markdown documents: a runbook
+  (`db-connection-pool-exhaustion.md`), an architecture note
+  (`checkout-service.md`), and one clearly-labeled synthetic historical
+  incident (`001.md`).
+- `tools/knowledge.py` — `search_knowledge`, `search_historical_incidents`,
+  `get_runbook`, keyword search (DDR-012 — no Qdrant/embeddings yet).
+- `evidence/models.py` — widened `Provenance.row_id` from `int` to `str`
+  so it can reference either a DB row or a knowledge-base file path with
+  one shape; `evidence/provenance.py` registered prefixes for
+  RUNBOOK/DOCUMENTATION/HISTORICAL_INCIDENT.
+- `tools/metrics.py` — added `known_anomaly_metrics()` (public accessor
+  agents use instead of reaching into the module's private threshold
+  table).
+- `docs/architecture.md` (Phase 4 slice) and `docs/design-decisions.md`
+  (DDR-010, DDR-011, DDR-012; DDR-008 updated to note `knowledge.py`
+  landed).
+
+**Files changed:** `core/llm/` (new), `agents/` (new), `knowledge/` (new),
+`tools/knowledge.py` (new), `tools/metrics.py`, `evidence/models.py`,
+`evidence/provenance.py`, `core/config.py`, `pyproject.toml` (httpx →
+main deps), `tests/unit/test_llm_providers.py`,
+`tests/unit/test_agent_base.py`, `tests/unit/test_tools_knowledge.py`,
+`tests/integration/test_agents.py`, `docs/architecture.md`,
+`docs/design-decisions.md`.
+
+**Tests added:**
+- Unit: LLM providers (Ollama/OpenAI-compatible/Anthropic-compatible),
+  each tested against `httpx.MockTransport` — success, HTTP error,
+  connection error, malformed response, all mapped to
+  `LLMUnavailableError`; the factory returns the right type per
+  `llm_provider` setting and rejects an unknown one.
+  `agents/base.py`'s pattern matching and LLM-or-fallback behavior
+  (no LLM, LLM succeeds, LLM raises). `tools/knowledge.py` (no DB
+  needed — pure filesystem + no incident-window scoping): default search
+  returns every doc, query filters correctly, evidence_id/provenance
+  format, `get_runbook` hit and miss.
+- Integration (real Postgres, seeded via `run_scenario`): each of the
+  five agents' `investigate()` produces the exact structured output
+  expected from the scenario's real evidence (triage's two hypotheses
+  matching the two deployments; logs' spike finding and the
+  connection-pool-exhaustion hypothesis; metrics flagging exactly the
+  three metrics that cross their thresholds; code correctly separating
+  same-service from different-service deployments; knowledge finding all
+  three corpus documents); an agent's `evidence` structurally cannot
+  carry `is_distractor`; passing a fake LLM provider is reflected in the
+  `summary` field.
+
+**Commands actually run in this session, with real output:**
+```
+uv sync                   # httpx promoted to main deps, resolved cleanly
+uv run pytest -v          # 61 passed (27 new for Phase 4), against the
+                           # same real local Postgres as Phases 2-3
+uv run ruff check .       # All checks passed!
+uv run ruff format --check .   # 62 files already formatted
+```
+Also manually ran all five agents end-to-end against a fresh incident and
+printed their actual structured output (no LLM configured — this sandbox
+genuinely has none, confirmed by trying to reach Ollama and both major
+hosted APIs before writing this phase). Real, correct results: Triage
+found both deployments and both services; Logs found the two error-log
+spike buckets and correctly surfaced "Connection pool exhaustion",
+"connectivity issue", **and** "Cache layer (Redis) involvement" as
+candidate patterns (the Redis distractor is surfaced, not asserted as the
+cause — exactly the intended behavior); Metrics flagged exactly the three
+anomalous metrics; Code correctly labeled the checkout deploy as
+"same service as incident" and the auth deploy as "different service";
+Knowledge found all three corpus documents.
+
+**Known limitations:**
+- No LLM was actually exercised end-to-end in this sandbox (none is
+  reachable) — the Ollama/OpenAI/Anthropic-compatible request/response
+  shapes are verified against mocked HTTP, not a live model. Whoever runs
+  this with a real Ollama instance is the first real-world exercise of
+  that path.
+- `hypotheses_from_content`'s pattern table is small and specific to the
+  one scenario that exists — by design (DDR-010), but it means it needs
+  active upkeep as `simulator/failure_injector/` grows more scenarios.
+- No orchestrator ties the five agents together yet — each is
+  independently callable and independently tested, matching Phase 4's
+  definition of done ("each agent independently executes tools"), but
+  nothing yet produces one incident-level result. That's Phase 5.
+- Agents are plain async functions, not LangGraph nodes and not wrapped
+  as LLM-callable tools with allowlisting/timeouts/max-call-limits (spec
+  §39) — that hardening is Phase 5/8.
+- `docker-compose.yml` doesn't include an Ollama service yet — nothing
+  automatically calls an agent with an LLM today (no orchestrator, no API
+  route), so a multi-GB model-serving container would sit idle in the
+  default `docker compose up` stack. Add it once Phase 5 gives it a real
+  caller, per the same "don't build ahead of the consumer" reasoning as
+  DDR-005/DDR-009.
+
+**Next phase:** Phase 5 — Orchestration.

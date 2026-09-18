@@ -23,6 +23,6 @@ def test_provenance_carries_the_row_reference():
     after = datetime.now(UTC)
 
     assert provenance.table == "log_events"
-    assert provenance.row_id == 42
+    assert provenance.row_id == "42"  # stringified — see evidence/models.py's Provenance docstring
     assert provenance.incident_id == "INC-0001"
     assert before - timedelta(seconds=1) <= provenance.retrieved_at <= after + timedelta(seconds=1)

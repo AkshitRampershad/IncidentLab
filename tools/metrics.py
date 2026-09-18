@@ -22,6 +22,13 @@ _ANOMALY_THRESHOLDS: dict[str, tuple[str, float]] = {
 }
 
 
+def known_anomaly_metrics() -> list[str]:
+    """The metric_names detect_anomaly() has a threshold for. Callers
+    (e.g. agents/metrics.py) use this instead of reaching into
+    _ANOMALY_THRESHOLDS directly, so they never need to know it exists."""
+    return sorted(_ANOMALY_THRESHOLDS)
+
+
 def _to_evidence(row: MetricPointRecord, *, relevance: float) -> Evidence:
     return Evidence(
         evidence_id=build_evidence_id(SourceType.METRIC, row.id),

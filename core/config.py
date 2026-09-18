@@ -22,6 +22,15 @@ class Settings(BaseSettings):
     postgres_password: str = "incidentlab"
     postgres_db: str = "incidentlab"
 
+    # spec §44: local Ollama is the default, never a hard requirement on a
+    # proprietary API. "openai" and "anthropic" here mean OpenAI/Anthropic
+    # *-compatible HTTP APIs (base_url is swappable), not a vendor lock-in.
+    llm_provider: str = "ollama"
+    llm_model: str = "llama3.1"
+    llm_base_url: str = "http://localhost:11434"
+    llm_api_key: str | None = None
+    llm_timeout_seconds: float = 30.0
+
     @property
     def database_url(self) -> str:
         return (

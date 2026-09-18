@@ -136,8 +136,77 @@ All four tool modules search a padded window
 `[start_time, end_time]`) rather than the exact incident window, so a
 precursor deployment a few minutes before `start_time` is still found.
 
-Not yet built: `tools/github.py`, `tools/knowledge.py`, `tools/traces.py`
-(DDR-008 — no real commit/PR/runbook data exists yet), `evidence/graph.py`
+Not yet built: `tools/github.py`, `tools/traces.py` (DDR-008 — no real
+commit/PR data or tracing backend exists yet), `evidence/graph.py`
 (DDR-009 — no consumer until the Phase 7 UI). Nothing here is wrapped as
 an LLM-callable tool yet either — these are plain typed async functions;
 Phase 4 wires them into agents.
+
+## Phase 4: Agents
+
+```mermaid
+flowchart LR
+    caller[future orchestrator / test] --> triage[agents/triage.py]
+    caller --> logsA[agents/logs.py]
+    caller --> metricsA[agents/metrics.py]
+    caller --> codeA[agents/code.py]
+    caller --> knowledgeA[agents/knowledge.py]
+
+    triage --> tools3[Phase 3 tools]
+    logsA --> tools3
+    metricsA --> tools3
+    codeA --> tools3
+    knowledgeA --> toolsK[tools/knowledge.py]
+
+    logsA -.optional.-> llm[core/llm/<br/>LLMProvider]
+    metricsA -.optional.-> llm
+    codeA -.optional.-> llm
+    knowledgeA -.optional.-> llm
+    triage -.optional.-> llm
+
+    llm -.-> ollama[(Ollama,<br/>default — not<br/>installed in this<br/>sandbox)]
+```
+
+- **`core/llm/`** — spec §44's model abstraction. `LLMProvider` (ABC,
+  `generate(prompt, system=None) -> str`) with three implementations —
+  `OllamaProvider` (default), `OpenAICompatibleProvider`,
+  `AnthropicCompatibleProvider` — all raising the single
+  `LLMUnavailableError` on any failure, so callers never need to know
+  which HTTP shape or client failed underneath. `core/llm/factory.py`'s
+  `get_llm_provider()` reads `core.config.Settings` (`llm_provider`,
+  `llm_model`, `llm_base_url`, `llm_api_key`). No live LLM exists in this
+  sandbox (no Ollama, no API access), so every provider is tested via
+  `httpx.MockTransport` — real request/response shape verified, zero
+  network dependency.
+- **`agents/base.py`** — the two pieces of logic shared by every agent:
+  `hypotheses_from_content` (a small, deliberately non-exhaustive keyword
+  → hypothesis-text pattern table — grows as `simulator/failure_injector/`
+  grows more scenarios) and `summarize_or_fallback` (try the LLM, degrade
+  to a deterministic fallback on absence or failure — never blocks, never
+  fabricates). See DDR-010 for why an agent's structured output never
+  depends on the LLM being reachable, only its prose `summary` does.
+- **`agents/models.py`** — `TriageFinding` (spec §10's shape) and
+  `InvestigatorFinding` (spec §11's shared shape for the other four
+  agents).
+- **`agents/triage.py`** — affected services, time window, investigation
+  targets (every service actually seen in the window — including
+  distractor services, deliberately: the agent isn't told which are
+  real), and evidence-grounded initial hypotheses from nearby
+  deployments. No `get_service_metadata()` — no service registry exists
+  to back one.
+- **`agents/logs.py` / `agents/metrics.py`** — thin wrappers over the
+  Phase 3 tools, turning spikes/anomalies into structured `findings`.
+- **`agents/code.py`** — reuses `tools.deployments.get_recent_deployments`
+  rather than a new git-backed tool (DDR-011): a deployment record already
+  carries a commit_sha and change description.
+- **`agents/knowledge.py`** — searches the new `knowledge/` corpus (three
+  real markdown documents: a runbook, an architecture note, one
+  clearly-labeled synthetic historical incident) via
+  `tools/knowledge.py`'s keyword search (DDR-012 — no Qdrant/embeddings
+  yet, and at this corpus size a vector store would be pure overhead).
+
+Every agent's `investigate(incident_id, llm=None)` is independently
+callable and independently tested against a real seeded incident — there
+is no orchestrator wiring them together yet (that's Phase 5), and none of
+this is wrapped as an LLM-callable tool with allowlisting/timeouts (that's
+Phase 8's security hardening, spec §39).
