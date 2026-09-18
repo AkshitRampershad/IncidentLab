@@ -23,8 +23,9 @@ reset: ## Stop and remove containers + volumes (drops the local Postgres data).
 clean: reset ## Remove local build/dependency artifacts.
 	rm -rf .venv apps/web/node_modules apps/web/.next .pytest_cache .ruff_cache
 
-incident: ## Phase 2 (Incident Simulator) - not implemented yet.
-	@echo "make incident is implemented in Phase 2 (Incident Simulator)."
+incident: ## Generate a reproducible incident: make incident SCENARIO=db_connection_pool
+	@test -n "$(SCENARIO)" || (echo "Usage: make incident SCENARIO=<id> (e.g. db_connection_pool)"; exit 1)
+	uv run python -m simulator.replay --scenario $(SCENARIO)
 
 investigate: ## Phase 5 (Orchestration) - not implemented yet.
 	@echo "make investigate is implemented in Phase 5 (Orchestration)."

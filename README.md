@@ -2,11 +2,11 @@
 
 Open-source multi-agent incident investigation & evaluation lab.
 
-> **Status: Phase 1 of 10 (Repository + Infrastructure).** The
-> investigation agents, evidence layer, and evaluation harness described
-> below don't exist yet. See `docs/IMPLEMENTATION_STATUS.md` for what's
-> actually implemented today, and don't take the rest of this README as a
-> description of current capability.
+> **Status: Phase 2 of 10 (Incident Simulator).** The investigation agents,
+> evidence layer, and evaluation harness described below don't exist yet.
+> See `docs/IMPLEMENTATION_STATUS.md` for what's actually implemented
+> today, and don't take the rest of this README as a description of
+> current capability.
 
 ## What is IncidentLab?
 
@@ -33,7 +33,7 @@ question rather than assume it).
 
 ## Architecture
 
-See `docs/architecture.md` for the current (Phase 1) architecture and
+See `docs/architecture.md` for the current architecture and
 `docs/design-decisions.md` for why things are built the way they are.
 
 ## Quick Start
@@ -55,17 +55,32 @@ Ports are configurable in `.env`.
 
 ```bash
 make setup   # uv sync + npm install
-make test    # pytest
+make test    # pytest (unit + integration; integration needs a reachable
+             # Postgres — docker compose up postgres, or a local install)
 make lint    # ruff check + eslint
 make format  # ruff format
 ```
 
+## Running an incident
+
+Requires a reachable Postgres (`docker compose up postgres -d`, or local).
+
+```bash
+make incident SCENARIO=db_connection_pool
+```
+
+Generates a reproducible incident deterministically: a deploy shrinks
+checkout's DB connection pool, it saturates, error rate and latency spike,
+plus some unrelated distractor noise. Prints the new `INC-XXXX` id. Ground
+truth (the actual root cause) is stored in a separate table the
+investigator never queries — see `docs/architecture.md`.
+
 ## Roadmap
 
-Running an incident, running an investigation, agent architecture,
-evaluation, benchmark results, security, and limitations sections will be
-filled in as each phase (see `docs/IMPLEMENTATION_STATUS.md`) actually
-ships — not written speculatively ahead of the code.
+Running an investigation, agent architecture, evaluation, benchmark
+results, security, and limitations sections will be filled in as each
+phase (see `docs/IMPLEMENTATION_STATUS.md`) actually ships — not written
+speculatively ahead of the code.
 
 ## License
 

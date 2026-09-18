@@ -8,6 +8,20 @@ on:
 jobs:
   api:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: incidentlab
+          POSTGRES_PASSWORD: incidentlab
+          POSTGRES_DB: incidentlab
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U incidentlab"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v3
@@ -21,6 +35,8 @@ jobs:
         run: uv run ruff format --check .
       - name: Test
         run: uv run pytest
+        env:
+          POSTGRES_HOST: localhost
 
   web:
     runs-on: ubuntu-latest

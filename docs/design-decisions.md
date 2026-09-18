@@ -57,3 +57,48 @@ implemented.
 compile, can't be tested, and git doesn't even track empty directories. The
 target structure is documented; it doesn't need to exist as empty folders
 today.
+
+## DDR-006: shared config/DB code lives in `core/`, not `apps/api`
+
+**Context:** Phase 2's simulator needs the same database settings and
+engine Phase 1 built for the API. The spec's tree has no shared location
+for this.
+
+**Decision:** moved `Settings`, `get_engine`, `check_connection` out of
+`apps/api/dependencies/` into a new top-level `core/` package
+(`core/config.py`, `core/db.py`, `core/models.py` for the shared ORM
+schema). `apps/api` now imports from `core`, not the other way around.
+
+**Why:** `simulator/` importing from `apps.api` would be a backwards
+dependency — business/domain logic depending on the presentation layer.
+`evidence/` and `tools/` (Phase 3) will need the same database access, so
+this was going to be needed regardless; doing it now, while only two
+call sites use it, is a small refactor. Waiting would mean repeating it
+under worse conditions once more code depends on the old location.
+
+## DDR-007: the simulator synthesizes telemetry deterministically — it
+doesn't run real microservices under load
+
+**Context:** the spec suggests using "the OpenTelemetry ecosystem or an
+equivalent open-source microservice demo" for the incident simulator,
+which usually means a multi-language, dozen-service demo application
+generating load-driven telemetry.
+
+**Decision:** `simulator/failure_injector/` generates logs, metrics, and
+deployment records directly as data, anchored to a single `anchor_time`,
+rather than standing up real services and inducing failure in them under
+synthetic traffic.
+
+**Why:** a real multi-service demo is a large, mostly-unrelated
+undertaking or Phase 2's actual goal, which is a reproducible incident
+with known ground truth and realistic-looking evidence (spec §4.5, §8).
+Deterministic generation directly satisfies "reproducible" (principle
+4.5) and "deterministic systems around probabilistic systems" (principle
+4.2) — the same scenario always produces the same structure. It also
+means the simulator has no runtime dependency this sandbox can't
+exercise: it's pure Python plus Postgres, both already provable in CI
+without needing Docker Hub access (see Phase 1's `docker compose up`
+verification gap) or a running fleet of containers. Revisit only if a
+later phase genuinely needs live request/response behavior (e.g. testing
+an agent's tool-call retry logic against a real flaky endpoint) rather
+than the evidence a scenario leaves behind.

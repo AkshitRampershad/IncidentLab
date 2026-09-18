@@ -2,7 +2,7 @@ import structlog
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
-from apps.api.dependencies.database import check_connection
+from core.db import check_connection
 
 logger = structlog.get_logger()
 

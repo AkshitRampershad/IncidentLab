@@ -4,10 +4,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """Application configuration, sourced from environment variables / .env.
+    """Shared configuration, sourced from environment variables / .env.
 
-    Only Phase 1 settings live here; later phases (LLM provider, Qdrant,
-    confidence thresholds, etc.) extend this as those subsystems land.
+    Lives in `core` (not `apps/api`) because it's consumed by more than the
+    web API: the simulator (Phase 2) and, later, the evidence/tool layer
+    all need the same database settings without depending on the API layer.
     """
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
