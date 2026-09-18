@@ -34,9 +34,12 @@ class FakeLLM(LLMProvider):
 
 def test_hypotheses_from_content_matches_known_patterns():
     evidence = [_evidence("[error] database connection timeout after 30000ms (pool exhausted)")]
-    hypotheses = hypotheses_from_content(evidence)
-    assert "Connection pool exhaustion" in hypotheses
-    assert "Database or downstream connectivity issue (connection timeouts)" in hypotheses
+    signals = hypotheses_from_content(evidence)
+    texts = [s.hypothesis for s in signals]
+    assert "Connection pool exhaustion" in texts
+    assert "Database or downstream connectivity issue (connection timeouts)" in texts
+    for signal in signals:
+        assert signal.evidence_ids == ["LOG-1"]
 
 
 def test_hypotheses_from_content_no_match_returns_empty():

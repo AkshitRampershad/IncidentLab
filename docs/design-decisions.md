@@ -221,3 +221,90 @@ and gives the Knowledge Investigator agent genuine, correctly-provenanced
 evidence today. Revisit once the corpus is large enough that "does the
 right document rank first" is an actual question — Qdrant is already in
 the target stack (spec §6) for exactly that point.
+
+## DDR-013: a small canonical-grouping table merges cross-agent hypothesis signals; unmapped signals still stand alone
+
+**Context:** the Log agent might produce the signal text "Connection pool
+exhaustion" and the Metrics agent might independently produce
+"db_connections_active anomaly" — two different phrasings of the *same*
+underlying root cause, from two different sources. Left ungrouped, the
+Hypothesis Manager would score them as two separate, individually weaker,
+single-source hypotheses, instead of one well-corroborated, multi-source
+one — directly undermining spec §15's "correlate evidence across
+sources."
+
+**Decision:** `hypotheses/manager.py`'s `_CANONICAL_HYPOTHESES` maps a
+canonical description to the list of per-agent signal texts that count as
+support for it. Any `HypothesisSignal` text not listed in any group still
+becomes its own standalone `Hypothesis` — nothing is silently dropped for
+being unmapped, it just doesn't get merged-evidence credit.
+
+**Why:** this is the same shape of decision as `agents/base.py`'s
+`_HYPOTHESIS_PATTERNS` (DDR-010) — a small, explicit, deterministic table
+rather than trying to infer semantic equivalence between hypothesis
+strings automatically (which would mean either fuzzy text matching,
+fragile and wrong in both directions, or an LLM call, reintroducing the
+exact "LLM arbitrarily decides" problem spec §16 warns against). Grows
+alongside `_HYPOTHESIS_PATTERNS` as more scenarios are added — the two
+tables are companions, not independent.
+
+The same table is reused by `hypotheses/contradiction.py`'s
+`detect_contradictions()`: for a canonical hypothesis, if one of its
+member signals is a `"<metric> anomaly"` text and that metric was
+actually measured but did *not* cross its threshold, that measured
+(non-anomalous) point is contradicting evidence — spec §17's own worked
+example ("Metrics Agent: Database connection utilization remained
+normal") in exactly this shape. For the one scenario that exists today,
+this correctly finds *zero* contradictions (metrics do confirm what logs
+show) — matching spec §21's own worked RCA example ("Contradictions: None
+detected"). The rule is general enough to fire for a future scenario
+where evidence genuinely disagrees, without needing to special-case one.
+
+## DDR-014: the orchestration graph is single-pass — no loop-back for more investigation
+
+**Context:** spec §5's architecture diagram shows an arrow from "Low
+confidence" back to "Agents" for further investigation, and §19 mentions
+this as a possibility.
+
+**Decision:** `orchestration/graph.py`'s graph is a straight line (with
+one parallel fan-out/fan-in): Triage → {Logs, Metrics, Code, Knowledge}
+→ Hypothesis Manager → Adjudicator → END. Low confidence produces
+`needs_human_review=True` in the final result (spec §20's human review,
+which this phase treats as a valid terminal outcome, not an error) — it
+does not re-invoke the agents with a different, narrower investigation
+plan.
+
+**Why:** a real loop-back needs real logic deciding *what* to investigate
+next and *why* — which evidence source to re-query, with what different
+parameters — which is a meaningfully new capability (dynamic replanning),
+not a graph-wiring change. Phase 5's definition of done is "incident →
+agents → hypotheses → evidence → RCA," which a single pass already
+satisfies end to end, verified by `make investigate`. Building speculative
+replanning logic now, before there's a second scenario to prove it
+against, risks getting the shape wrong. Revisit once evaluation (Phase 6)
+shows *which* low-confidence cases would actually benefit from a second
+pass, rather than guessing now.
+
+## DDR-015: the Knowledge agent's evidence corroborates the winning hypothesis at adjudication time, not during hypothesis-building
+
+**Context:** the Knowledge agent (unlike Logs/Metrics/Code) doesn't
+produce its own `hypotheses_supported` — see `agents/knowledge.py`. Its
+evidence still needs to reach the final result somehow.
+
+**Decision:** `hypotheses/manager.py`'s `build_hypotheses()` only ever
+looks at Logs/Metrics/Code. `agents/adjudicator.py` attaches Knowledge
+evidence to the *already-selected* winning hypothesis's
+`supporting_evidence` — via simple shared-keyword overlap between the
+hypothesis description and the knowledge content — after the winner is
+chosen, not before.
+
+**Why:** attaching Knowledge evidence to *every* candidate hypothesis
+equally during scoring would inflate every hypothesis's evidence count
+and source diversity by the same fixed amount, without helping
+distinguish between them (the entire point of the Hypothesis Manager).
+Attaching it only to the winner keeps hypothesis *scoring* clean
+(driven only by evidence that actually differentiates candidates) while
+still surfacing genuinely relevant runbooks/historical incidents in the
+final adjudicated result — which is also where `agents/adjudicator.py`'s
+`_recommend_action()` looks for a matching runbook to cite, rather than
+inventing a remediation step (spec §4.3).

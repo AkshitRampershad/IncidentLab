@@ -1,5 +1,6 @@
 import structlog
 
+from agents.models import HypothesisSignal
 from core.llm import LLMProvider, LLMUnavailableError
 from evidence.models import Evidence
 
@@ -19,15 +20,16 @@ _HYPOTHESIS_PATTERNS: list[tuple[str, str]] = [
 ]
 
 
-def hypotheses_from_content(evidence: list[Evidence]) -> list[str]:
+def hypotheses_from_content(evidence: list[Evidence]) -> list[HypothesisSignal]:
     """Deterministic keyword-pattern matching over evidence content, in
-    registration order, each hypothesis at most once."""
-    lowered = [e.content.lower() for e in evidence]
-    return [
-        hypothesis
-        for keyword, hypothesis in _HYPOTHESIS_PATTERNS
-        if any(keyword in content for content in lowered)
-    ]
+    registration order, each hypothesis at most once — with exactly which
+    evidence items matched, not just the hypothesis text."""
+    signals = []
+    for keyword, hypothesis in _HYPOTHESIS_PATTERNS:
+        matching_ids = [e.evidence_id for e in evidence if keyword in e.content.lower()]
+        if matching_ids:
+            signals.append(HypothesisSignal(hypothesis=hypothesis, evidence_ids=matching_ids))
+    return signals
 
 
 async def summarize_or_fallback(

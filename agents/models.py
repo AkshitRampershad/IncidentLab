@@ -20,6 +20,16 @@ class TriageFinding(BaseModel):
     summary: str
 
 
+class HypothesisSignal(BaseModel):
+    """One hypothesis an agent's evidence supports, with exactly which
+    evidence items support it. The Hypothesis Manager (Phase 5) needs this
+    precise linkage — re-deriving it later by re-parsing evidence content
+    would be fragile and duplicate logic the agent already has."""
+
+    hypothesis: str
+    evidence_ids: list[str]
+
+
 class InvestigatorFinding(BaseModel):
     """spec §11's shared output shape for the Log/Metrics/Code/Knowledge
     investigator agents."""
@@ -27,5 +37,5 @@ class InvestigatorFinding(BaseModel):
     agent_name: str
     findings: list[str]
     evidence: list[Evidence]
-    hypotheses_supported: list[str]
+    hypotheses_supported: list[HypothesisSignal]
     summary: str

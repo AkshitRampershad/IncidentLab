@@ -2,11 +2,11 @@
 
 Open-source multi-agent incident investigation & evaluation lab.
 
-> **Status: Phase 4 of 10 (Agents).** Five agents (triage, logs, metrics,
-> code, knowledge) each independently investigate an incident and produce
-> structured findings — but nothing orchestrates them together yet, and
-> the hypothesis manager, contradiction detector, confidence gating, and
-> evaluation harness described below don't exist yet. See
+> **Status: Phase 5 of 10 (Orchestration).** `make investigate
+> INCIDENT=<id>` runs a full investigation end to end — five agents in
+> parallel, hypothesis correlation, contradiction detection, confidence
+> gating, an adjudicated result. The evaluation harness, baselines, and
+> web UI described below don't exist yet. See
 > `docs/IMPLEMENTATION_STATUS.md` for what's actually implemented today,
 > and don't take the rest of this README as a description of current
 > capability.
@@ -78,10 +78,25 @@ plus some unrelated distractor noise. Prints the new `INC-XXXX` id. Ground
 truth (the actual root cause) is stored in a separate table the
 investigator never queries — see `docs/architecture.md`.
 
+## Running an investigation
+
+```bash
+make investigate INCIDENT=INC-0001
+```
+
+Runs Triage, then Logs/Metrics/Code/Knowledge in parallel, correlates
+their findings into competing hypotheses, checks for contradictions
+between sources, and adjudicates a final result — selected root cause,
+confidence, evidence, and a recommended action (citing a real runbook
+when one matches). By default it tries a local Ollama for nicer prose
+summaries and falls back to fully deterministic ones if none is running
+(`--no-llm` skips the attempt). See `docs/architecture.md`'s Phase 5
+section for how the pieces fit together.
+
 ## Roadmap
 
-Running an investigation, agent architecture, evaluation, benchmark
-results, security, and limitations sections will be filled in as each
+Agent architecture detail, evaluation, benchmark results, security, and
+limitations sections will be filled in as each
 phase (see `docs/IMPLEMENTATION_STATUS.md`) actually ships — not written
 speculatively ahead of the code.
 

@@ -4,7 +4,7 @@
 - [x] Phase 2 — Incident Simulator
 - [x] Phase 3 — Evidence Layer
 - [x] Phase 4 — Agents
-- [ ] Phase 5 — Orchestration
+- [x] Phase 5 — Orchestration
 - [ ] Phase 6 — Evaluation
 - [ ] Phase 7 — UI
 - [ ] Phase 8 — Security + Observability
@@ -417,3 +417,118 @@ Knowledge found all three corpus documents.
   DDR-005/DDR-009.
 
 **Next phase:** Phase 5 — Orchestration.
+
+---
+
+## Phase 5 — Orchestration
+
+**Implemented:**
+- Refactored `InvestigatorFinding.hypotheses_supported` from `list[str]`
+  to `list[HypothesisSignal]` (hypothesis text + exactly which
+  evidence_ids support it) across all four investigator agents — the
+  Hypothesis Manager needs precise evidence linkage, not fragile
+  re-parsing of hypothesis text after the fact.
+- `hypotheses/` package: `models.py` (`Hypothesis`), `scoring.py`
+  (spec §16's deterministic confidence formula), `contradiction.py`
+  (spec §17's Contradiction Detector), `manager.py` (spec §15's
+  Hypothesis Manager — merges cross-agent signals via a canonical
+  grouping table, DDR-013).
+- `agents/adjudicator.py` — spec §18's Adjudicator: `AdjudicationResult`,
+  picks the best hypothesis, attaches corroborating Knowledge evidence to
+  the winner (DDR-015), recommends an action by citing a real runbook if
+  one matched (never a fabricated remediation step).
+- `orchestration/` package: `state.py` (`InvestigationState` TypedDict),
+  `routing.py` (spec §19's confidence gate, thresholds configurable via
+  `core.config.Settings`), `graph.py` (the actual `langgraph.StateGraph`:
+  Triage → parallel {Logs, Metrics, Code, Knowledge} → Hypothesis Manager
+  → Adjudicator → END, plus the `make investigate INCIDENT=<id>` CLI).
+- `langgraph` added as a dependency.
+- `core/config.py`: `confidence_strong_threshold` (0.90),
+  `confidence_review_threshold` (0.70) — spec §19's own instruction that
+  these be configurable, not hardcoded.
+- `Makefile`: `investigate` target now works.
+- `docs/architecture.md` (Phase 5 slice) and `docs/design-decisions.md`
+  (DDR-013, DDR-014, DDR-015).
+
+**Files changed:** `hypotheses/` (new), `orchestration/` (new, beyond the
+Phase 1 stub), `agents/adjudicator.py` (new), `agents/models.py`,
+`agents/base.py`, `agents/logs.py`, `agents/metrics.py`, `agents/code.py`,
+`agents/knowledge.py`, `core/config.py`, `Makefile`, `pyproject.toml`
+(langgraph), `tests/unit/test_agent_base.py`,
+`tests/integration/test_agents.py` (updated for the `HypothesisSignal`
+shape), plus five new test files (see below), `docs/architecture.md`,
+`docs/design-decisions.md`.
+
+**Tests added:**
+- Unit (no DB — all pure functions over fabricated data):
+  `test_hypotheses_scoring.py` (formula cases: zero evidence, full
+  coverage, partial coverage, contradiction penalty, floor at zero);
+  `test_hypotheses_contradiction.py` (confirmed metric → no contradiction;
+  measured-but-not-flagged → contradiction; never-measured → no
+  contradiction; non-metric signal → ignored);
+  `test_hypotheses_manager.py` (cross-agent signals merge into one
+  canonical hypothesis with combined evidence; unmapped signals stand
+  alone; sorted descending; multi-source hypotheses outscore
+  single-source ones; confirmed metrics produce no contradiction);
+  `test_orchestration_routing.py` (gate boundaries, configurable
+  thresholds); `test_adjudicator.py` (no hypotheses → insufficient
+  evidence; selects the top hypothesis; strong vs. weak confidence gating;
+  runbook-matched vs. generic recommended action; contradicting evidence
+  carried through; LLM override).
+- Integration (real Postgres, seeded via `run_scenario`):
+  `test_orchestration.py` — the full graph end to end selects "Connection
+  pool exhaustion" with confidence > 0.9, `needs_human_review: False`,
+  zero contradictions, and cites the real runbook; hypotheses are sorted;
+  no `is_distractor` leakage anywhere in the final result.
+
+**Commands actually run in this session, with real output:**
+```
+uv add langgraph          # resolved cleanly (PyPI is directly reachable
+                           # in this sandbox, unlike Docker Hub)
+uv run pytest -v          # 88 passed (27 new for Phase 5), against the
+                           # same real local Postgres as Phases 2-4
+uv run ruff check .       # All checks passed!
+uv run ruff format --check .   # 78 files already formatted
+make incident SCENARIO=db_connection_pool   # -> Created incident INC-0001
+make investigate INCIDENT=INC-0001
+  # Selected hypothesis: Connection pool exhaustion
+  # Confidence: 93%
+  # Needs human review: False
+  # Recommended action: See runbook
+  #   'runbooks/db-connection-pool-exhaustion.md' for remediation steps.
+  # Contradicting evidence: none detected
+  # (6 "llm_summary_unavailable" warnings logged first — Ollama isn't
+  #  running here, every agent tried it, failed fast, degraded
+  #  gracefully; total wall time ~2 seconds for the whole graph)
+uv run python -m orchestration.graph --incident INC-0001 --no-llm
+  # identical result, instantly, no LLM attempt at all
+make investigate                    # -> usage error (no INCIDENT), exit 1
+python -m orchestration.graph --incident INC-9999
+  # -> ValueError "Incident 'INC-9999' not found", propagated clearly
+  #    through the graph (not swallowed, not fabricated)
+```
+
+**Known limitations:**
+- No loop-back for more investigation on low confidence (DDR-014) — a
+  low-confidence result sets `needs_human_review: True` and stops; it
+  doesn't re-invoke agents with a narrower plan. Deferred until there's a
+  second scenario to design that against.
+- The canonical hypothesis-grouping table (`_CANONICAL_HYPOTHESES`) and
+  the keyword-pattern table (`_HYPOTHESIS_PATTERNS`, Phase 4) are both
+  small and specific to the one scenario that exists — by design, but
+  both need active upkeep as more scenarios are added.
+- No LLM was actually exercised end-to-end (same as Phase 4 — none is
+  reachable in this sandbox); `make investigate`'s default attempt to
+  reach Ollama and gracefully degrade was verified for real, but the
+  "LLM actually produces a reasoning summary" path has only been unit
+  tested against a fake provider.
+- No `/investigations` API endpoints yet (spec §38) — `make investigate`
+  is a CLI only; wiring this into `apps/api` is future work once there's
+  a UI (Phase 7) to actually call it.
+- Still no full spec §21 RCA report format (Executive Summary, Timeline,
+  Impact, Uncertainty, Investigation Trace sections) — `AdjudicationResult`
+  has the substance (selected hypothesis, confidence, evidence,
+  contradictions, recommended action) but not that presentation; that's
+  Phase 7's UI layer built on top of this.
+
+**Next phase:** Phase 6 — Evaluation.

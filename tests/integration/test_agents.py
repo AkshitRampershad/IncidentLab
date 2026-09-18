@@ -36,15 +36,24 @@ async def test_logs_agent(incident_id):
     assert finding.agent_name == "logs"
     assert len(finding.evidence) == 14
     assert any("12 error-level" in f for f in finding.findings)
-    assert "Connection pool exhaustion" in finding.hypotheses_supported
+    hypothesis_texts = [s.hypothesis for s in finding.hypotheses_supported]
+    assert "Connection pool exhaustion" in hypothesis_texts
+    pool_signal = next(
+        s for s in finding.hypotheses_supported if s.hypothesis == "Connection pool exhaustion"
+    )
+    assert len(pool_signal.evidence_ids) == 12
 
 
 async def test_metrics_agent(incident_id):
     finding = await metrics.investigate(incident_id)
 
     assert finding.agent_name == "metrics"
-    metric_names_flagged = {h.replace(" anomaly", "") for h in finding.hypotheses_supported}
+    metric_names_flagged = {
+        s.hypothesis.replace(" anomaly", "") for s in finding.hypotheses_supported
+    }
     assert metric_names_flagged == {"error_rate", "latency_p99_ms", "db_connections_active"}
+    for signal in finding.hypotheses_supported:
+        assert len(signal.evidence_ids) == 1
 
 
 async def test_code_agent(incident_id):
@@ -53,7 +62,8 @@ async def test_code_agent(incident_id):
     assert finding.agent_name == "code"
     assert len(finding.evidence) == 2
     assert len(finding.hypotheses_supported) == 1
-    assert "checkout" in finding.hypotheses_supported[0]
+    assert "checkout" in finding.hypotheses_supported[0].hypothesis
+    assert len(finding.hypotheses_supported[0].evidence_ids) == 1
 
 
 async def test_knowledge_agent(incident_id):

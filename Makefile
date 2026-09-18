@@ -27,8 +27,9 @@ incident: ## Generate a reproducible incident: make incident SCENARIO=db_connect
 	@test -n "$(SCENARIO)" || (echo "Usage: make incident SCENARIO=<id> (e.g. db_connection_pool)"; exit 1)
 	uv run python -m simulator.replay --scenario $(SCENARIO)
 
-investigate: ## Phase 5 (Orchestration) - not implemented yet.
-	@echo "make investigate is implemented in Phase 5 (Orchestration)."
+investigate: ## Run a full investigation: make investigate INCIDENT=INC-0001
+	@test -n "$(INCIDENT)" || (echo "Usage: make investigate INCIDENT=<id> (e.g. INC-0001)"; exit 1)
+	uv run python -m orchestration.graph --incident $(INCIDENT)
 
 evaluate: ## Phase 6 (Evaluation) - not implemented yet.
 	@echo "make evaluate is implemented in Phase 6 (Evaluation)."

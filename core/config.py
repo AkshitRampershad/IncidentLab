@@ -31,6 +31,13 @@ class Settings(BaseSettings):
     llm_api_key: str | None = None
     llm_timeout_seconds: float = 30.0
 
+    # spec §19's confidence gate: >= strong -> confident conclusion;
+    # >= review (but < strong) -> conclusion + human review; below review
+    # -> insufficient evidence. "Initial configuration, not universal
+    # truths" per the spec's own words — hence configurable, not hardcoded.
+    confidence_strong_threshold: float = 0.90
+    confidence_review_threshold: float = 0.70
+
     @property
     def database_url(self) -> str:
         return (

@@ -210,3 +210,71 @@ callable and independently tested against a real seeded incident — there
 is no orchestrator wiring them together yet (that's Phase 5), and none of
 this is wrapped as an LLM-callable tool with allowlisting/timeouts (that's
 Phase 8's security hardening, spec §39).
+
+## Phase 5: Orchestration
+
+```mermaid
+flowchart LR
+    incident([incident_id]) --> triage[Triage]
+    triage --> logsA[Logs]
+    triage --> metricsA[Metrics]
+    triage --> codeA[Code]
+    triage --> knowledgeA[Knowledge]
+    logsA --> hyp[Hypothesis Manager<br/>+ Contradiction Detection]
+    metricsA --> hyp
+    codeA --> hyp
+    knowledgeA --> hyp
+    hyp --> adj[Adjudicator<br/>+ Confidence Gate]
+    adj --> rca([AdjudicationResult])
+```
+
+- **`orchestration/state.py`** — `InvestigationState`, a `TypedDict` shared
+  across every node. Each investigator node writes its own distinct key
+  (`logs_finding`, `metrics_finding`, ...), so the four run genuinely in
+  parallel with no reducer needed — LangGraph's default per-key
+  last-write-wins is exactly correct when only one node ever writes each
+  key.
+- **`orchestration/graph.py`** — builds the actual `langgraph.StateGraph`:
+  Triage fans out to the four investigators, they fan back in to the
+  Hypothesis Manager (a plain node function, not an LLM call), then the
+  Adjudicator, then `END`. `investigate(incident_id, llm=None)` is the
+  public entrypoint (`await app.ainvoke(...)`); `main()` wraps it as the
+  `make investigate INCIDENT=<id>` CLI, which by default tries to
+  construct a real `LLMProvider` from `core.config.Settings` (Ollama, per
+  spec §6's default) and gracefully degrades per-agent if it's
+  unreachable — `--no-llm` skips the attempt entirely. See DDR-014 for
+  why this graph is single-pass (no loop-back to re-investigate on low
+  confidence).
+- **`hypotheses/manager.py`** — spec §15's Hypothesis Manager. Merges
+  `HypothesisSignal`s from Logs/Metrics/Code into competing `Hypothesis`
+  objects, using a small canonical-grouping table (DDR-013) so signals
+  from different agents describing the same root cause combine into one
+  multi-source hypothesis instead of staying separately weaker. Knowledge
+  doesn't feed this — see DDR-015.
+- **`hypotheses/contradiction.py`** — spec §17's Contradiction Detector:
+  for a hypothesis expecting corroboration from a specific metric, if
+  that metric was measured but didn't cross its anomaly threshold, the
+  measured point becomes contradicting evidence. Reuses the same
+  canonical table (DDR-013).
+- **`hypotheses/scoring.py`** — spec §16's deterministic confidence
+  formula: weighted evidence coverage + source diversity + temporal
+  alignment − contradiction penalty, clamped to [0, 1]. An explicit,
+  documented experimental baseline, not a calibrated model.
+- **`agents/adjudicator.py`** — spec §18's Adjudicator: picks the
+  highest-confidence `Hypothesis`, attaches corroborating Knowledge
+  evidence to the winner only (DDR-015), and recommends an action by
+  citing a matching runbook if one was found among the evidence — never a
+  fabricated remediation step (spec §4.3).
+- **`orchestration/routing.py`** — spec §19's confidence gate
+  (`gate_confidence`, `needs_human_review`), thresholds read from
+  `core.config.Settings` (`confidence_strong_threshold`,
+  `confidence_review_threshold` — configurable per spec §19's own
+  instruction, not hardcoded).
+
+Verified end to end with `make investigate INCIDENT=INC-0001`: selects
+"Connection pool exhaustion" at 93% confidence, `needs_human_review:
+False`, zero contradictions, and cites the real runbook as the
+recommended action — all without any LLM actually running, since none is
+reachable in this sandbox (confirmed: Ollama connection attempts fail
+fast and every agent degrades to its deterministic fallback, ~2 seconds
+end to end for the whole graph).

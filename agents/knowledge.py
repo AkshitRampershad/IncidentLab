@@ -1,5 +1,5 @@
 from agents.base import summarize_or_fallback
-from agents.models import InvestigatorFinding
+from agents.models import HypothesisSignal, InvestigatorFinding
 from core.llm import LLMProvider
 from tools.knowledge import search_historical_incidents, search_knowledge
 
@@ -27,9 +27,9 @@ async def investigate(incident_id: str, llm: LLMProvider | None = None) -> Inves
         findings.append("No matching knowledge base entries found.")
 
     # Knowledge doesn't assert new root-cause hypotheses of its own — it
-    # contextualizes ones the other agents raise. Hypothesis Manager
-    # (Phase 5) is what ties this evidence back to a specific hypothesis.
-    hypotheses_supported: list[str] = []
+    # contextualizes ones the other agents raise. The Adjudicator (Phase 5)
+    # is what ties this evidence back to the winning hypothesis.
+    hypotheses_supported: list[HypothesisSignal] = []
 
     fallback = " ".join(findings)
     prompt = "Knowledge base matches:\n" + "\n".join(

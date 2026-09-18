@@ -1,5 +1,5 @@
 from agents.base import summarize_or_fallback
-from agents.models import InvestigatorFinding
+from agents.models import HypothesisSignal, InvestigatorFinding
 from core.llm import LLMProvider
 from tools.deployments import get_recent_deployments
 from tools.incidents import get_incident
@@ -35,7 +35,10 @@ async def investigate(incident_id: str, llm: LLMProvider | None = None) -> Inves
         findings.append("No deployments found near the incident window.")
 
     hypotheses_supported = [
-        f"Deployment to {e.source} may be related (same service, near incident start)"
+        HypothesisSignal(
+            hypothesis=f"Deployment to {e.source} may be related (near incident start)",
+            evidence_ids=[e.evidence_id],
+        )
         for e in evidence
         if e.source == incident.service
     ]
