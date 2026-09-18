@@ -102,3 +102,41 @@ verification gap) or a running fleet of containers. Revisit only if a
 later phase genuinely needs live request/response behavior (e.g. testing
 an agent's tool-call retry logic against a real flaky endpoint) rather
 than the evidence a scenario leaves behind.
+
+## DDR-008: `tools/github.py` and `tools/knowledge.py` are deferred, not stubbed
+
+**Context:** the spec's Code Investigator and Knowledge Investigator
+tools (spec §13, §14) need real commit/PR history and a searchable
+runbook/documentation corpus. Neither exists in this project yet — the
+simulator only ever generates a `commit_sha` *string* on a deployment
+record, never a real commit, and no runbook content has been authored.
+
+**Decision:** Phase 3 does not create `tools/github.py`, `tools/traces.py`,
+or `tools/knowledge.py`. Only `tools/logs.py`, `tools/metrics.py`,
+`tools/deployments.py`, and `tools/incidents.py` exist — the four sources
+the simulator actually produces data for.
+
+**Why:** a tool with no real backing data behind it is either a mock
+(violates "no placeholder functionality... call it complete") or would
+have to fabricate commit history / documentation content from nothing
+(violates "never invent evidence"). These land in Phase 4 alongside the
+Code and Knowledge Investigator agents that actually need them, once
+there's real content (a runbook, an architecture doc, a git-backed commit
+history) to search.
+
+## DDR-009: `evidence/graph.py` is deferred to Phase 7
+
+**Context:** the spec's file tree includes `evidence/graph.py` inside the
+Phase 3 package.
+
+**Decision:** not created yet. Phase 3's definition of done is "an
+incident can expose structured evidence through tools" — nothing consumes
+a graph structure until the Evidence Graph UI view (spec §35), which is
+Phase 7.
+
+**Why:** same reasoning as DDR-005 — a module with no caller yet is
+unverifiable scaffolding. `evidence.models.Evidence` already carries
+everything a graph view would need (evidence_id, source, timestamp,
+provenance); building the graph-shaping code now, before there's a
+consumer or even an agreed node/edge shape for the UI, risks writing it
+twice.

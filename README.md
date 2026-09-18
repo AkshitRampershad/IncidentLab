@@ -2,11 +2,11 @@
 
 Open-source multi-agent incident investigation & evaluation lab.
 
-> **Status: Phase 2 of 10 (Incident Simulator).** The investigation agents,
-> evidence layer, and evaluation harness described below don't exist yet.
-> See `docs/IMPLEMENTATION_STATUS.md` for what's actually implemented
-> today, and don't take the rest of this README as a description of
-> current capability.
+> **Status: Phase 3 of 10 (Evidence Layer).** The investigation agents and
+> evaluation harness described below don't exist yet. See
+> `docs/IMPLEMENTATION_STATUS.md` for what's actually implemented today,
+> and don't take the rest of this README as a description of current
+> capability.
 
 ## What is IncidentLab?
 

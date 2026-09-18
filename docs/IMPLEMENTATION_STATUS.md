@@ -2,7 +2,7 @@
 
 - [x] Phase 1 — Repository + Infrastructure
 - [x] Phase 2 — Incident Simulator
-- [ ] Phase 3 — Evidence Layer
+- [x] Phase 3 — Evidence Layer
 - [ ] Phase 4 — Agents
 - [ ] Phase 5 — Orchestration
 - [ ] Phase 6 — Evaluation
@@ -219,3 +219,88 @@ reviewed):**
   skipped without one — documented in the README, not yet auto-detected.
 
 **Next phase:** Phase 3 — Evidence Layer.
+
+---
+
+## Phase 3 — Evidence Layer
+
+**Implemented:**
+- `evidence/models.py` — `Evidence` (evidence_id, source_type, source,
+  timestamp, content, relevance, provenance) and the full `SourceType`
+  enum from spec §9 (only `log`/`metric`/`deployment` are produced so far
+  — see DDR-008). No `is_distractor` field exists on `Evidence` at all, so
+  a tool can't leak it even by accident.
+- `evidence/provenance.py` — `build_evidence_id` (`LOG-1842` /
+  `METRIC-203` / `DEPLOY-482`, matching spec §9's own example format) and
+  `build_provenance`.
+- `evidence/scoring.py` — `temporal_relevance` (1.0 inside the incident
+  window, decaying outside it, floor 0.2 — documented as an experimental
+  baseline, not a calibrated model) and `matches_query`.
+- `tools/incidents.py` — `get_incident` (public fields only) and
+  `get_incident_timeline` (chronological merge across logs/metrics/
+  deployments).
+- `tools/logs.py` — `search_logs` (spec §11) and `find_error_spikes`
+  (minute-bucketed error counts).
+- `tools/metrics.py` — `query_metrics` and `detect_anomaly` (spec §12),
+  against a fixed, documented threshold table.
+  `compare_baseline` is intentionally not implemented — no real
+  pre-incident baseline data exists to compare against yet (see
+  docs/architecture.md).
+- `tools/deployments.py` — `get_recent_deployments` (spec §13),
+  deliberately not filtered to only the affected service.
+- `docs/architecture.md` (Phase 3 slice) and `docs/design-decisions.md`
+  (DDR-008: `tools/github.py`/`tools/knowledge.py` deferred to Phase 4 —
+  no real commit/PR/runbook data exists yet; DDR-009: `evidence/graph.py`
+  deferred to Phase 7 — no consumer until the UI).
+
+**Files changed:** `evidence/` (new), `tools/` (new),
+`tests/unit/test_evidence_scoring.py`,
+`tests/unit/test_evidence_provenance.py`,
+`tests/integration/test_tools.py`, `docs/architecture.md`,
+`docs/design-decisions.md`.
+
+**Tests added:**
+- Unit (no DB): scoring (`temporal_relevance` inside/outside/floor,
+  `matches_query`), provenance (`evidence_id` prefixes, unregistered
+  source type raises, provenance fields correct).
+- Integration (real Postgres, seeded via `run_scenario`):
+  `Evidence.model_fields` structurally has no `is_distractor`;
+  `get_incident` exposes only public fields and raises for an unknown id;
+  `search_logs` returns exactly the 14 rows the scenario generates
+  (including distractor content, unflagged) and its query filter narrows
+  correctly; `find_error_spikes` finds exactly one 12-error spike bucket;
+  `query_metrics` filters by name; `detect_anomaly` flags the saturated
+  connection-pool point but not the healthy baseline one, and rejects an
+  unregistered metric name; `get_recent_deployments` spans both the
+  affected and the distractor service; `get_incident_timeline` merges all
+  three sources in chronological order.
+
+**Commands actually run in this session, with real output:**
+```
+uv run pytest -v            # 34 passed (11 new for Phase 3), against the
+                             # same real local Postgres as Phase 2
+uv run ruff check .         # All checks passed!
+uv run ruff format --check . # 40 files already formatted
+```
+Also manually ran the full pipeline (`run_scenario` → `get_incident_timeline`
+→ `find_error_spikes`) and printed the actual output to eyeball realism —
+correct chronological order, sensible relevance scores (1.00 inside the
+window, 0.97 for the trigger deploy 1 minute before it, 0.70 for the
+distractor deploy 10 minutes before it), and the error spike detector
+correctly found the one 12-error-in-one-minute bucket.
+
+**Known limitations:**
+- Only 3 of the spec's 9 source types are backed by real data
+  (log/metric/deployment) — commit, pull_request, documentation, runbook,
+  historical_incident, and trace all wait on Phase 4's Code/Knowledge
+  investigator work landing real data behind them.
+- `detect_anomaly`'s thresholds are a hardcoded, documented heuristic
+  tuned to make this one scenario legible, not a statistically grounded
+  anomaly detector.
+- `compare_baseline` (spec §12) doesn't exist — no real baseline data to
+  compare against.
+- These are plain async functions, not yet wrapped as LangGraph/LLM-
+  callable tools (no allowlisting, timeouts, or max-call limits yet) —
+  that wiring, and the security hardening from spec §39, are Phase 4/8.
+
+**Next phase:** Phase 4 — Agents.

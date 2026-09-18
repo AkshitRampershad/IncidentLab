@@ -73,3 +73,71 @@ flowchart LR
 Nothing yet *exposes* this telemetry to an agent as scored, provenanced
 evidence — that abstraction (spec §9's Evidence model, `relevance`,
 `evidence_id`) is Phase 3.
+
+## Phase 3: Evidence Layer
+
+```mermaid
+flowchart LR
+    caller[future agent / test] --> incidents[tools/incidents.py]
+    caller --> logs[tools/logs.py]
+    caller --> metrics[tools/metrics.py]
+    caller --> deployments[tools/deployments.py]
+
+    logs --> scoring[evidence/scoring.py]
+    metrics --> scoring
+    deployments --> scoring
+    logs --> provenance[evidence/provenance.py]
+    metrics --> provenance
+    deployments --> provenance
+
+    logs -->|SELECT| db[(Postgres:<br/>log_events / metric_points /<br/>deployments / incidents)]
+    metrics -->|SELECT| db
+    deployments -->|SELECT| db
+    incidents -->|SELECT| db
+```
+
+- **`evidence/models.py`** — `Evidence` (evidence_id, source_type, source,
+  timestamp, content, relevance, provenance) and `SourceType` (spec §9's
+  full enum, though only `log`/`metric`/`deployment` are produced so far —
+  see DDR-008). `Evidence` has no `is_distractor` field by construction:
+  a tool physically cannot leak it through this model, not just by
+  convention.
+- **`evidence/provenance.py`** — `build_evidence_id` (the `LOG-1842` /
+  `METRIC-203` / `DEPLOY-482` format from spec §9's example) and
+  `build_provenance` (which table/row this came from, when it was
+  fetched).
+- **`evidence/scoring.py`** — `temporal_relevance`: 1.0 inside the
+  incident's `[start_time, end_time]`, decaying the further outside it a
+  timestamp falls (floor 0.2). A documented experimental baseline (spec
+  §16), not a calibrated model — the point is that it's deterministic and
+  reproducible, not that the decay curve is "correct". `matches_query`:
+  case-insensitive substring filter.
+- **`tools/incidents.py`** — `get_incident` (the public `IncidentPublic`
+  model — service/severity/description/start/end, structurally incapable
+  of carrying ground truth) and `get_incident_timeline` (every log/metric/
+  deployment Evidence in the window, chronologically merged).
+- **`tools/logs.py`** — `search_logs` (optionally filtered by substring)
+  and `find_error_spikes` (minute-bucketed error counts ≥3 — a derived
+  aggregate over several rows, so it's a separate `LogSpike` model, not
+  forced into the single-row-backed `Evidence` shape).
+- **`tools/metrics.py`** — `query_metrics` and `detect_anomaly` (a fixed,
+  documented per-metric threshold table — e.g. `error_rate > 0.05`,
+  `db_connections_active >= 5`). `compare_baseline` (spec §12) is *not*
+  implemented: it needs a genuine pre-incident "normal" window the
+  simulator doesn't generate, and fabricating one would violate "never
+  invent evidence" (spec §4.3).
+- **`tools/deployments.py`** — `get_recent_deployments`, across every
+  service in the window (not just the affected one — an unrelated
+  service's deploy is exactly the kind of distractor an agent needs to
+  see and correctly discount, not have pre-filtered away).
+
+All four tool modules search a padded window
+(`evidence.scoring.SEARCH_WINDOW_PADDING`, 15 minutes either side of
+`[start_time, end_time]`) rather than the exact incident window, so a
+precursor deployment a few minutes before `start_time` is still found.
+
+Not yet built: `tools/github.py`, `tools/knowledge.py`, `tools/traces.py`
+(DDR-008 — no real commit/PR/runbook data exists yet), `evidence/graph.py`
+(DDR-009 — no consumer until the Phase 7 UI). Nothing here is wrapped as
+an LLM-callable tool yet either — these are plain typed async functions;
+Phase 4 wires them into agents.
