@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 
 import { ConfidenceBar } from "@/components/ConfidenceBar";
+import { Gloss } from "@/components/Gloss";
 import { SeverityBadge } from "@/components/SeverityBadge";
 import { api, ApiError } from "@/lib/api";
 import type {
@@ -18,6 +19,13 @@ const AGENT_LABELS: Record<string, string> = {
   metrics: "Metrics Investigator",
   code: "Code Investigator",
   knowledge: "Knowledge Investigator",
+};
+
+const AGENT_ROLES: Record<string, string> = {
+  logs: "Searches log evidence for errors and anomalies in the incident window.",
+  metrics: "Checks metrics against registered anomaly thresholds.",
+  code: "Flags recent deploys near the incident window.",
+  knowledge: "Searches runbooks and prior incidents for relevant context.",
 };
 
 const EVIDENCE_PREVIEW_LENGTH = 220;
@@ -84,6 +92,11 @@ export default function IncidentPage() {
     return <div className="error-box">{error}</div>;
   }
 
+  const agentCount = investigation ? Object.keys(investigation.agents).length : 0;
+  const agentSuccessCount = investigation
+    ? Object.values(investigation.agents).filter((f) => !f.degraded).length
+    : 0;
+
   return (
     <div>
       <div className="panel">
@@ -123,12 +136,76 @@ export default function IncidentPage() {
 
       {investigation && (
         <>
+          {/* Plain-language verdict, up front — before any jargon below. */}
+          <div className={`verdict-banner${investigation.adjudication.needs_human_review ? " needs-review" : ""}`}>
+            <div className="verdict-eyebrow">
+              {investigation.adjudication.needs_human_review
+                ? "● Needs human review"
+                : "● Investigation complete"}
+            </div>
+            <h2>
+              {investigation.adjudication.selected_hypothesis
+                ? `Root cause: ${investigation.adjudication.selected_hypothesis}`
+                : "Insufficient evidence for a confident root cause"}
+            </h2>
+            <p className="verdict-explain">{investigation.adjudication.reasoning_summary}</p>
+            <div className="verdict-stats">
+              <div className="vstat">
+                <div className="n">{Math.round(investigation.adjudication.confidence * 100)}%</div>
+                <div className="l">
+                  <Gloss term="Confidence">
+                    How much the evidence supports this conclusion — computed by a fixed formula,
+                    not a model&apos;s guess. Low confidence triggers human review automatically.
+                  </Gloss>
+                </div>
+              </div>
+              <div className="vstat">
+                <div className="n">
+                  {agentSuccessCount} / {agentCount}
+                </div>
+                <div className="l">Agents ran successfully</div>
+              </div>
+              <div className="vstat">
+                <div className="n">{investigation.adjudication.supporting_evidence.length}</div>
+                <div className="l">Supporting evidence items</div>
+              </div>
+              <div className="vstat">
+                <div className="n">{investigation.adjudication.needs_human_review ? "Yes" : "No"}</div>
+                <div className="l">Human review required</div>
+              </div>
+            </div>
+          </div>
+
           <div className="panel">
-            <div className="panel-title">Agent Activity</div>
+            <div className="panel-title">What we recommend</div>
+            <p style={{ margin: 0 }}>{investigation.adjudication.recommended_action}</p>
+            <div className="row" style={{ marginTop: 14 }}>
+              <button className="secondary" onClick={() => review("approve")}>
+                ✓ Approve this conclusion
+              </button>
+              <button className="secondary danger" onClick={() => review("reject")}>
+                ✗ Reject
+              </button>
+              {reviewNote && (
+                <span className="small dim">
+                  {reviewNote.status === "approved" ? "Approved." : "Rejected."} (acknowledgment only —
+                  see recommended_action note)
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div className="panel">
+            <div className="panel-title">
+              <Gloss term="Agent activity">
+                IncidentLab runs several independent AI agents in parallel, each looking at a
+                different kind of evidence — like specialists on a real incident-response team.
+              </Gloss>
+            </div>
             <div className="grid-2">
               {Object.entries(investigation.agents).map(([key, finding]) => (
                 <div className="agent-card" key={key}>
-                  <div className="row" style={{ justifyContent: "space-between", marginBottom: 8 }}>
+                  <div className="row" style={{ justifyContent: "space-between", marginBottom: 4 }}>
                     <strong>{AGENT_LABELS[key] ?? key}</strong>
                     {finding.degraded ? (
                       <span className="badge badge-warning">degraded</span>
@@ -136,6 +213,7 @@ export default function IncidentPage() {
                       <span className="badge badge-success">✓</span>
                     )}
                   </div>
+                  {AGENT_ROLES[key] && <div className="agent-role">{AGENT_ROLES[key]}</div>}
                   <ul style={{ margin: 0, paddingLeft: 18 }}>
                     {finding.findings.map((f, i) => (
                       <li key={i} className="small" style={{ marginBottom: 4 }}>
@@ -152,7 +230,12 @@ export default function IncidentPage() {
           </div>
 
           <div className="panel">
-            <div className="panel-title">Hypotheses</div>
+            <div className="panel-title">
+              <Gloss term="Hypotheses considered">
+                Every possible explanation the agents found, ranked by confidence — not just the
+                winner. Shows the system&apos;s reasoning, not just its answer.
+              </Gloss>
+            </div>
             {investigation.hypotheses.length === 0 && (
               <p className="dim">No hypotheses were generated from the available evidence.</p>
             )}
@@ -168,62 +251,35 @@ export default function IncidentPage() {
           </div>
 
           <div className="panel">
-            <div className="panel-title">Root Cause Analysis</div>
-            <div style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 17, fontWeight: 700, marginBottom: 4 }}>
-                {investigation.adjudication.selected_hypothesis ?? "Insufficient evidence"}
+            <div className="panel-title">Evidence &amp; reasoning</div>
+            <details>
+              <summary style={{ cursor: "pointer", color: "var(--accent)", fontWeight: 600 }}>
+                View full supporting &amp; contradicting evidence (
+                {investigation.adjudication.supporting_evidence.length +
+                  investigation.adjudication.contradicting_evidence.length}{" "}
+                items)
+              </summary>
+              <div className="grid-2" style={{ marginTop: 12 }}>
+                <div>
+                  <div className="panel-title">Supporting Evidence</div>
+                  {investigation.adjudication.supporting_evidence.length === 0 && (
+                    <p className="dim small">None.</p>
+                  )}
+                  {investigation.adjudication.supporting_evidence.map((e) => (
+                    <EvidenceItem e={e} key={e.evidence_id} />
+                  ))}
+                </div>
+                <div>
+                  <div className="panel-title">Contradicting Evidence</div>
+                  {investigation.adjudication.contradicting_evidence.length === 0 && (
+                    <p className="dim small">None detected.</p>
+                  )}
+                  {investigation.adjudication.contradicting_evidence.map((e) => (
+                    <EvidenceItem e={e} key={e.evidence_id} />
+                  ))}
+                </div>
               </div>
-              <ConfidenceBar confidence={investigation.adjudication.confidence} />
-            </div>
-
-            {investigation.adjudication.needs_human_review && (
-              <div className="badge badge-warning" style={{ marginBottom: 14 }}>
-                Human review required
-              </div>
-            )}
-
-            <p>{investigation.adjudication.reasoning_summary}</p>
-
-            <div className="grid-2" style={{ marginTop: 10 }}>
-              <div>
-                <div className="panel-title">Supporting Evidence</div>
-                {investigation.adjudication.supporting_evidence.length === 0 && (
-                  <p className="dim small">None.</p>
-                )}
-                {investigation.adjudication.supporting_evidence.map((e) => (
-                  <EvidenceItem e={e} key={e.evidence_id} />
-                ))}
-              </div>
-              <div>
-                <div className="panel-title">Contradicting Evidence</div>
-                {investigation.adjudication.contradicting_evidence.length === 0 && (
-                  <p className="dim small">None detected.</p>
-                )}
-                {investigation.adjudication.contradicting_evidence.map((e) => (
-                  <EvidenceItem e={e} key={e.evidence_id} />
-                ))}
-              </div>
-            </div>
-
-            <div className="panel-title" style={{ marginTop: 14 }}>
-              Recommended Action
-            </div>
-            <p style={{ marginTop: 0 }}>{investigation.adjudication.recommended_action}</p>
-
-            <div className="row" style={{ marginTop: 12 }}>
-              <button className="secondary" onClick={() => review("approve")}>
-                Approve
-              </button>
-              <button className="secondary danger" onClick={() => review("reject")}>
-                Reject
-              </button>
-              {reviewNote && (
-                <span className="small dim">
-                  {reviewNote.status === "approved" ? "Approved." : "Rejected."} (acknowledgment only —
-                  see recommended_action note)
-                </span>
-              )}
-            </div>
+            </details>
           </div>
         </>
       )}

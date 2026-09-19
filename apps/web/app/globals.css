@@ -68,9 +68,27 @@ code,
 
 .nav {
   display: flex;
+  align-items: center;
   gap: 18px;
   font-size: 13px;
+}
+.nav a {
   color: var(--text-dim);
+}
+.nav a.active {
+  color: var(--text);
+}
+.nav-cta {
+  background: rgba(77, 141, 255, 0.12);
+  color: var(--accent) !important;
+  border: 1px solid rgba(77, 141, 255, 0.35);
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-weight: 600;
+}
+.nav-cta:hover {
+  text-decoration: none;
+  filter: brightness(1.15);
 }
 
 .panel {
@@ -271,4 +289,350 @@ th {
   border-radius: 6px;
   padding: 12px 14px;
   font-size: 13px;
+}
+
+/* --- Landing narrative (dashboard hero + story blocks) --- */
+.hero-block {
+  padding: 12px 0 40px;
+}
+.hero-block h1 {
+  font-size: 30px;
+  line-height: 1.3;
+  margin: 0 0 14px;
+  font-weight: 700;
+  max-width: 680px;
+}
+.hero-block .lede {
+  font-size: 15px;
+  color: var(--text-dim);
+  max-width: 620px;
+  line-height: 1.65;
+  margin: 0 0 22px;
+}
+.hero-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.story-block {
+  padding: 40px 0;
+  border-bottom: 1px solid var(--border);
+}
+.story-block:last-of-type {
+  border-bottom: none;
+}
+.story-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  margin-bottom: 10px;
+}
+.story-label.problem {
+  color: var(--critical);
+}
+.story-label.status-quo {
+  color: var(--warning);
+}
+.story-label.solution {
+  color: var(--success);
+}
+.story-title {
+  font-size: 22px;
+  line-height: 1.3;
+  margin: 0 0 14px;
+  max-width: 620px;
+}
+.story-body {
+  font-size: 14.5px;
+  color: var(--text-dim);
+  line-height: 1.7;
+  max-width: 640px;
+  margin: 0;
+}
+.story-body + .story-body {
+  margin-top: 12px;
+}
+.story-body strong {
+  color: var(--text);
+}
+
+.quo-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-top: 22px;
+}
+@media (max-width: 780px) {
+  .quo-grid {
+    grid-template-columns: 1fr;
+  }
+}
+.quo-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 18px;
+}
+.quo-card .ic {
+  font-size: 18px;
+  margin-bottom: 10px;
+  opacity: 0.85;
+}
+.quo-card h4 {
+  margin: 0 0 6px;
+  font-size: 13.5px;
+}
+.quo-card p {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text-faint);
+  line-height: 1.55;
+}
+
+.flow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 22px 0 18px;
+  flex-wrap: wrap;
+}
+.flow-step {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.flow-arrow {
+  color: var(--text-faint);
+}
+.flow-step.result {
+  border-color: rgba(62, 207, 142, 0.4);
+  color: var(--success);
+}
+
+.stack-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 18px 0;
+}
+.stack-chip {
+  background: var(--bg-panel-raised);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 6px 14px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.honesty-note {
+  margin-top: 14px;
+  font-size: 12.5px;
+  color: var(--text-faint);
+  border-left: 2px solid var(--border);
+  padding-left: 12px;
+  line-height: 1.6;
+  max-width: 620px;
+}
+
+.proof-stats {
+  display: flex;
+  gap: 28px;
+  margin: 20px 0 4px;
+  flex-wrap: wrap;
+}
+.pstat .n {
+  font-size: 20px;
+  font-weight: 700;
+}
+.pstat .l {
+  font-size: 11.5px;
+  color: var(--text-faint);
+  max-width: 170px;
+  line-height: 1.4;
+  margin-top: 2px;
+}
+
+/* --- Glossary tooltip: hover/focus a jargon term for a one-line plain-
+   English explanation, without sending the reader to another page. --- */
+.gloss {
+  border-bottom: 1px dotted var(--text-faint);
+  cursor: help;
+  position: relative;
+}
+.gloss .tip {
+  display: none;
+  position: absolute;
+  bottom: 130%;
+  left: 0;
+  background: var(--bg-panel-raised);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 11.5px;
+  color: var(--text-dim);
+  width: 230px;
+  z-index: 5;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+}
+.gloss:hover .tip,
+.gloss:focus .tip {
+  display: block;
+}
+
+/* --- Empty state (nicer than a bare error box when there's just nothing yet) --- */
+.empty-state {
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  padding: 30px 20px;
+  text-align: center;
+  color: var(--text-dim);
+}
+.empty-state .icon {
+  font-size: 20px;
+  margin-bottom: 8px;
+  opacity: 0.6;
+}
+.empty-state strong {
+  color: var(--text);
+  display: block;
+  margin-bottom: 4px;
+  font-size: 13.5px;
+}
+.empty-state p {
+  margin: 0 auto;
+  max-width: 360px;
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+/* --- Verdict banner (investigation results): the plain-language answer,
+   shown before any technical detail. --- */
+.verdict-banner {
+  background: linear-gradient(135deg, rgba(62, 207, 142, 0.08), rgba(77, 141, 255, 0.05));
+  border: 1px solid rgba(62, 207, 142, 0.3);
+  border-radius: 12px;
+  padding: 22px 26px;
+  margin-bottom: 16px;
+}
+.verdict-banner.needs-review {
+  background: linear-gradient(135deg, rgba(232, 163, 61, 0.08), rgba(77, 141, 255, 0.05));
+  border-color: rgba(232, 163, 61, 0.35);
+}
+.verdict-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 8px;
+  color: var(--success);
+}
+.verdict-banner.needs-review .verdict-eyebrow {
+  color: var(--warning);
+}
+.verdict-banner h2 {
+  margin: 0 0 8px;
+  font-size: 19px;
+}
+.verdict-explain {
+  margin: 0 0 14px;
+  color: var(--text-dim);
+  font-size: 13.5px;
+  line-height: 1.6;
+  max-width: 720px;
+}
+.verdict-stats {
+  display: flex;
+  gap: 22px;
+  flex-wrap: wrap;
+}
+.vstat .n {
+  font-size: 18px;
+  font-weight: 700;
+}
+.vstat .l {
+  font-size: 11px;
+  color: var(--text-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.agent-role {
+  font-size: 11px;
+  color: var(--text-faint);
+  margin: 2px 0 8px;
+}
+
+/* --- Evaluation: architecture comparison cards, shown before the raw
+   metrics table. --- */
+.arch-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin: 22px 0;
+}
+@media (max-width: 780px) {
+  .arch-cards {
+    grid-template-columns: 1fr;
+  }
+}
+.arch-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  position: relative;
+}
+.arch-card.winner {
+  border-color: rgba(62, 207, 142, 0.4);
+  background: linear-gradient(160deg, rgba(62, 207, 142, 0.06), transparent);
+}
+.arch-card .winner-tag {
+  position: absolute;
+  top: -10px;
+  right: 16px;
+  background: var(--success);
+  color: #06110c;
+  font-size: 10px;
+  font-weight: 800;
+  padding: 3px 9px;
+  border-radius: 20px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.arch-card h3 {
+  font-size: 14px;
+  margin: 0 0 4px;
+}
+.arch-card .cost {
+  font-size: 11px;
+  color: var(--text-faint);
+  margin-bottom: 16px;
+}
+.big-metric {
+  margin-bottom: 14px;
+}
+.big-metric .n {
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1;
+}
+.big-metric .n.good {
+  color: var(--success);
+}
+.big-metric .n.bad {
+  color: var(--critical);
+}
+.big-metric .l {
+  font-size: 11px;
+  color: var(--text-faint);
+  margin-top: 4px;
 }

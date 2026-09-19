@@ -20,6 +20,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <nav className="nav">
               <Link href="/">Incidents</Link>
               <Link href="/evaluation">Evaluation</Link>
+              <a
+                className="nav-cta"
+                href="https://github.com/AkshitRampershad/incidentlab"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                View on GitHub
+              </a>
             </nav>
           </div>
           {children}
